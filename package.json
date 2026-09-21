@@ -26,7 +26,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test && node test/settings/save-semantics.mjs && node test/admin/admin-pane.mjs && node test/admin/admin-credential.mjs"
+    "test": "node --test"
   },
   "exports": {
     ".": {
