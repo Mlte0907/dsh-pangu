@@ -314,6 +314,32 @@ test('多模态内容提取开关默认关闭，并提示工具暴露状态', { 
   assert.equal([...container.querySelectorAll('select')].length, 0, '默认关闭时不应出现 Whisper 模型下拉')
 })
 
+test('服务端状态灯反映真实连通性，不谎报就绪', { skip }, async () => {
+  // 用户实测（2026-09-22）：装完插件但盘古本体还没装，设置页却显示
+  // 「MCP 服务已就绪」—— 因为旧实现只要 config 是对象就画绿灯，从不探测。
+  // 状态灯说谎比没有状态灯更糟：它会让人跳过真正的问题排查。
+  const off = await render(mountSettings({ ...FAKE_CFG, server_online: false }))
+  assert.ok(
+    off.container.textContent.includes('服务未连接'),
+    '服务端不可达时应显示「服务未连接」',
+  )
+  assert.ok(
+    !off.container.textContent.includes('MCP 服务已就绪'),
+    '不得再出现「已就绪」这种无探测的断言',
+  )
+  assert.ok(
+    off.container.textContent.includes('盘古本体可能还没启动'),
+    '未连接时应给出可操作的提示',
+  )
+
+  const on = await render(mountSettings({ ...FAKE_CFG, server_online: true }))
+  assert.ok(on.container.textContent.includes('服务已连接'), '连上时应显示「服务已连接」')
+  assert.ok(
+    !on.container.textContent.includes('盘古本体可能还没启动'),
+    '连上时不应再提示未启动',
+  )
+})
+
 test('原有记忆维护设置未被破坏', { skip }, async () => {
   const env = mountSettings(FAKE_CFG)
   const { container } = await render(env)
