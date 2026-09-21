@@ -14,6 +14,20 @@
   "license": "MIT",
   "type": "commonjs",
   "main": "lib/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mlte0907/dsh-pangu.git"
+  },
+  "homepage": "https://github.com/Mlte0907/dsh-pangu#readme",
+  "bugs": {
+    "url": "https://github.com/Mlte0907/dsh-pangu/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test && node test/settings/save-semantics.mjs && node test/admin/admin-pane.mjs && node test/admin/admin-credential.mjs"
+  },
   "exports": {
     ".": {
       "default": "./lib/index.js"
@@ -36,5 +50,10 @@
   },
   "dependencies": {
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
