@@ -1,2 +1,8 @@
-# 钥匙明文不得入库——cordis.patch.yml 含 X-API-Key 运行时值
-cordis.patch.yml
+# 运行时依赖不入库（安装时由 pnpm install --prod 生成）
+node_modules/
+
+# 注意：cordis.patch.yml **必须入库**，不能出现在忽略规则里。
+# 它是 DSH 的 bundle patch 入口，安装器（含 DSH 自带插件安装器）会按
+# .gitignore 规则过滤拷贝 —— 一旦被忽略，装好的包里就没有它，
+# DSH 启动即报「未能读取覆盖层 …cordis.patch.yml: ENOENT」（2026-09-22 实测踩到）。
+# 该文件本身不含密钥：X-API-Key 是运行时从 ~/.pangu/config.json 读的 IIFE 表达式。
