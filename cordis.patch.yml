@@ -1,23 +1,32 @@
 # dsh-pangu bundle patch: 盘古 MCP 接入 + 仪表盘宿主
 - insert:
+    # pangu-dashboard 排在前面:mcp-pangu 的地址/凭据由它在 apply() 里读
+    # ~/.pangu/config.json 后经 entry.update 注入(lib/mcp-inject.js),
+    # 先到者先把值备好;注入是普通 config 更新 → remount 热生效,
+    # 设置页保存时还会再注一次(保存即生效,无需重启)。
+    - id: pangu-dashboard
+      name: dsh-pangu
     - id: mcp-pangu
       name: '@deepseek-ai/dsh-mcp-client'
       config:
         serverName: pangu
         transport: streamable-http
-        # ── MCP 地址 ──────────────────────────────────────────────
-        # 与插件设置页「盘古服务地址」共用一个配置源：~/.pangu/config.json 的
-        # pangu_base_url（设置页改完重启 DSH，MCP 客户端随之重新挂载）。
-        # 未配置时回退默认本地。值必须是 http/https 地址。
-        url: !!js (function(){ try { const c = JSON.parse(require('fs').readFileSync(require('path').join(require('os').homedir(),'.pangu','config.json'),'utf8')); return String(c.pangu_base_url || 'http://127.0.0.1:19529').replace(/\/+$/, '') + '/mcp' } catch(e) { return 'http://127.0.0.1:19529/mcp' } })()
+        # ── MCP 地址与凭据:这里只是声明默认值,真实值由插件注入 ──────────
+        # 禁止再用求值器读文件的写法:Loader 求值域是 with(fiberCtx)+eval、
+        # 进程为 ESM,没有 require;旧写法的 catch 把 ReferenceError 静默吞掉,
+        # 回退 127.0.0.1:19529 + 空 X-API-Key → MCP 恒 disconnected
+        # (根因报告 dsh-pangu-mcp-disconnect-report.md,E1 已用真 evaluate 复跑证实)。
+        # 值来源仍是设置页共用的 ~/.pangu/config.json(pangu_base_url / api_key),
+        # 由 lib/mcp-inject.js 在激活与设置保存时注入;不回落 ~/.pangu/.mcp_key
+        # 或 PANGU_API_KEY —— 否则会出现「设置页填的是本地、实际却拿云端令牌去连」
+        # 的错配(表现为每个请求 401)。
+        # failOnStartupError: true = 注入未发生时启动即失败(响亮暴露),
+        # 而不是像旧 catch 那样静默连错地址;注入成功后会被改为 false。
+        url: http://127.0.0.1:19529/mcp
         toolCallTimeoutMs: 60000
-        # ── MCP 认证凭据 ──────────────────────────────────────────
-        # X-API-Key 与上面的 url 共用**同一个来源**：~/.pangu/config.json 的 api_key，
-        # 即插件设置页「盘古凭据」字段（!!js IIFE 在 Loader 挂载时求值）。
-        # 不再回落 ~/.pangu/.mcp_key / PANGU_API_KEY —— 否则会出现"设置页填的是本地、
-        # 实际却拿云端令牌去连"的错配（表现为每个请求 401）。
         headers:
-          X-API-Key: !!js (function(){ try { const c = JSON.parse(require('fs').readFileSync(require('path').join(require('os').homedir(),'.pangu','config.json'),'utf8')); return String(c.api_key || '').trim() } catch(e) { return '' } })()
+          X-API-Key: ''
+        failOnStartupError: true
         # ── 关于工具白名单 ──────────────────────────────────────────
         # 早期版本此处配置了 `tools.allow` 白名单（11 个工具）。
         # 但 `@deepseek-ai/dsh-mcp-client` 的 Config schema 并不包含
@@ -32,5 +41,3 @@
         # 缺省即收敛为 28 个核心工具，其余工具不会出现在 tools/list 中。
         # 需要放开时改 ~/.pangu/config.json：
         #   { "exposure": { "enabled_optional_modules": ["multimodal"] } }
-    - id: pangu-dashboard
-      name: dsh-pangu

@@ -31,6 +31,7 @@ cd dsh-pangu && ./install.sh          # 默认装到 web profile
 ```
 
 装完 **重启 DSH**（`cordis.patch.yml` 的热更新在 web 实例不生效，必须重启才加载）。
+之后改地址/凭据**无需再重启**：设置页保存即由插件热重注到 MCP 客户端（`lib/mcp-inject.js` → `entry.update`）。
 
 ## 装完只填两个字段
 
@@ -65,7 +66,8 @@ DSH → 设置 →「**盘古记忆系统**」：
 | 面板空白、日志 401 | 设置页「盘古凭据」没填或填错 —— 复制安装时打印的那串 |
 | 记忆/搜索不通 | 「盘古服务地址」不对；本机填 `http://127.0.0.1:19529` |
 | **管理页** 401 | 服务端 `~/.pangu/.admin_secret` 与「盘古凭据」不是同一把（早期部署）。装上跑一遍盘古的 `install.sh` 会打印统一命令；新装默认同值，不会遇到 |
-| 工具列表没刷新 | 重启 DSH（MCP 客户端重新挂载后才会拉新工具列表） |
+| 工具列表没刷新 | 服务端 exposure 改动后重启 DSH；仅改地址/凭据则保存设置即热重注 |
+| MCP 行启动失败 | `~/.pangu/config.json` 缺 `pangu_base_url` 或 `api_key` —— 设置页填好保存即自动重注（fail-loud，不再静默连 127.0.0.1） |
 | DSH 启动报 `ERR_MODULE_NOT_FOUND: zod` | 插件依赖没装：`cd <插件目录> && pnpm install --prod` |
 
 ## 开发
