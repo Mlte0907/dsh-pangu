@@ -157,22 +157,26 @@ test('设置页注册到 settings.section 槽', { skip }, async () => {
   assert.ok(ids.includes('pangu-settings'), `未注册设置页贡献, 实际: ${ids.join(',')}`)
 })
 
-test('LLM 表单四个字段与两个按钮都渲染', { skip }, async () => {
+test('LLM 表单四个字段与保存/放弃都渲染', { skip }, async () => {
   const env = mountSettings(FAKE_CFG)
   const { container } = await render(env)
 
-  const inputs = [...container.querySelectorAll('input, select')]
+  const selects = [...container.querySelectorAll('select')]
+  const inputs = [...container.querySelectorAll('input')]
   const buttons = [...container.querySelectorAll('button')].map((b) => b.textContent.trim())
 
-  // 提供商不是 <select>，而是 ProvCard 按钮组。原断言查 SELECT 之所以长期
-  // "通过"，是因为 whisper 默认开启时会渲染「Whisper 模型」下拉，被误认成了
-  // 提供商下拉；whisper 改为默认关闭后暴露（2026-09-21 修）。
-  assert.ok(buttons.some((b) => b.includes('DeepSeek')), '缺少提供商卡片')
+  // 提供商是单栏下拉（v5.1 起取代此前的三列卡片组：卡片组在单栏版面里占两行）
+  const prov = selects.find((s) => [...s.options].some((o) => o.value === 'deepseek'))
+  assert.ok(prov, '缺少提供商下拉')
+  assert.equal(prov.value, 'deepseek', '提供商下拉未选中已配置的提供商')
+  assert.ok([...prov.options].some((o) => o.textContent === '智谱 GLM'), '提供商下拉缺少智谱 GLM')
+
   assert.ok(inputs.some((i) => i.value === 'deepseek-chat'), '缺少模型输入框')
   assert.ok(inputs.some((i) => i.value === 'https://api.deepseek.com/v1'), '缺少 Base URL 输入框')
   assert.ok(inputs.some((i) => i.getAttribute('type') === 'password'), '缺少 API Key 密码框')
   assert.ok(buttons.some((b) => b.includes('测试连接')), '缺少「测试连接」按钮')
   assert.ok(buttons.some((b) => b === '保存'), '缺少「保存」按钮')
+  assert.ok(buttons.some((b) => b === '放弃'), '缺少「放弃」按钮')
 })
 
 test('语音转写默认关闭，不渲染 Whisper 模型下拉', { skip }, async () => {
@@ -185,7 +189,10 @@ test('语音转写默认关闭，不渲染 Whisper 模型下拉', { skip }, asyn
   assert.ok(container.textContent.includes('启用 Whisper'), '缺少启用开关')
   assert.ok(container.textContent.includes('默认关闭'), '未标明默认关闭')
   const selects = [...container.querySelectorAll('select')]
-  assert.equal(selects.length, 0, '默认关闭时不应出现 Whisper 模型下拉')
+  // 不能断言「页面没有 select」——提供商本身就是下拉。要断的是
+  // **Whisper 模型**那个下拉在开关关闭时不出现（2026-09-24 修）。
+  const whisperSel = selects.find((s) => [...s.options].some((o) => /Tiny \(75MB\)/.test(o.textContent)))
+  assert.equal(whisperSel, undefined, '默认关闭时不应出现 Whisper 模型下拉')
 })
 
 test('提供商选项齐全且与 llm.py 的 PROVIDER_URLS 对齐', { skip }, async () => {
@@ -311,18 +318,19 @@ test('多模态内容提取开关默认关闭，并提示工具暴露状态', { 
   assert.ok(container.textContent.includes('默认关闭'), '未标明默认关闭')
   assert.ok(container.textContent.includes('工具当前未暴露'), '未提示工具暴露状态')
   // FAKE_CFG 既没写 whisper_enabled 也没写 multimodal_enabled ⇒ 两个都应为关
-  assert.equal([...container.querySelectorAll('select')].length, 0, '默认关闭时不应出现 Whisper 模型下拉')
+  const whisperSel = [...container.querySelectorAll('select')]
+    .find((s) => [...s.options].some((o) => /Tiny \(75MB\)/.test(o.textContent)))
+  assert.equal(whisperSel, undefined, '默认关闭时不应出现 Whisper 模型下拉')
 })
 
 test('服务端状态灯反映真实连通性，不谎报就绪', { skip }, async () => {
   // 用户实测（2026-09-22）：装完插件但盘古本体还没装，设置页却显示
   // 「MCP 服务已就绪」—— 因为旧实现只要 config 是对象就画绿灯，从不探测。
   // 状态灯说谎比没有状态灯更糟：它会让人跳过真正的问题排查。
+  // v5.1 起状态收进四格总览卡，按 data-state 取值，不靠文案匹配。
+  const cell = (c) => c.container.querySelector('[data-pg-cell="盘古服务"]')
   const off = await render(mountSettings({ ...FAKE_CFG, server_online: false }))
-  assert.ok(
-    off.container.textContent.includes('服务未连接'),
-    '服务端不可达时应显示「服务未连接」',
-  )
+  assert.equal(cell(off)?.getAttribute('data-state'), 'offline', '服务端不可达时状态格应为 offline')
   assert.ok(
     !off.container.textContent.includes('MCP 服务已就绪'),
     '不得再出现「已就绪」这种无探测的断言',
@@ -333,11 +341,46 @@ test('服务端状态灯反映真实连通性，不谎报就绪', { skip }, asyn
   )
 
   const on = await render(mountSettings({ ...FAKE_CFG, server_online: true }))
-  assert.ok(on.container.textContent.includes('服务已连接'), '连上时应显示「服务已连接」')
+  assert.equal(cell(on)?.getAttribute('data-state'), 'online', '连上时状态格应为 online')
   assert.ok(
     !on.container.textContent.includes('盘古本体可能还没启动'),
     '连上时不应再提示未启动',
   )
+})
+
+test('三个开关都有可及名', { skip }, async () => {
+  // 开关的 <input> 是透明的，文字在 <label> 之外 —— 不给 aria-label 的话
+  // 读屏只会念「复选框」，用户不知道是哪个设置（2026-09-24）。
+  const env = mountSettings(FAKE_CFG)
+  const { container } = await render(env)
+  const boxes = [...container.querySelectorAll('input[type=checkbox]')]
+  assert.equal(boxes.length, 3, '应渲染三个开关')
+  for (const box of boxes) {
+    assert.ok(box.getAttribute('aria-label'), '开关缺少 aria-label')
+  }
+})
+
+test('「放弃」把草稿拉回已保存的值', { skip }, async () => {
+  const env = mountSettings(FAKE_CFG)
+  const { container } = await render(env)
+  const setVal = (el, v) => {
+    const setter = Object.getOwnPropertyDescriptor(env.win.HTMLInputElement.prototype, 'value').set
+    setter.call(el, v)
+    el.dispatchEvent(new env.win.Event('input', { bubbles: true }))
+  }
+  const btn = (label) => [...container.querySelectorAll('button')].find((b) => b.textContent.trim() === label)
+  const base = [...container.querySelectorAll('input')].find((i) => i.value.startsWith('https://api.deepseek.com'))
+
+  await env.act(async () => { setVal(base, 'https://api.deepseek.com/beta') })
+  await env.act(async () => { await new Promise((r) => setTimeout(r, 50)) })
+  assert.equal(btn('保存').disabled, false, '改动后保存按钮应可用')
+
+  await env.act(async () => { btn('放弃').dispatchEvent(new env.win.MouseEvent('click', { bubbles: true })) })
+  await env.act(async () => { await new Promise((r) => setTimeout(r, 50)) })
+
+  assert.equal(base.value, 'https://api.deepseek.com/v1', '放弃后应回到已保存的 Base URL')
+  assert.equal(btn('保存').disabled, true, '放弃后保存按钮应回到禁用')
+  assert.ok(container.textContent.includes('已放弃未保存的更改'), '未提示已放弃')
 })
 
 test('原有记忆维护设置未被破坏', { skip }, async () => {
