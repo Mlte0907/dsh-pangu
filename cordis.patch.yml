@@ -6,9 +6,9 @@
         serverName: pangu
         transport: streamable-http
         # ── MCP 地址与凭据:这里只是引导默认值,真实值由插件注入 ──────────
-        # 行序必须 mcp-pangu 在前:EntryTree 按序建行,pangu-dashboard 的
-        # apply() 需要 store 里已有本行才能 entry.update(曾因前置 dashboard
-        # 导致 row not found、注入未发生 —— 顺序即证据)。
+        # 注入经 ctx.loader.entries() 递归查找本行(bundle patch 行挂在 Include
+        # 子树,本层 store/resolve 查不到 —— 0.6.0/0.6.1 曾因此 miss);
+        # 行序保持 mcp 在前仅为可读性,查找与行序无关。
         # 禁止再用求值器读文件:Loader 求值域是 with(fiberCtx)+eval、进程 ESM,
         # 没有 require;旧写法 catch 静默回退 127.0.0.1:19529 + 空 X-API-Key
         # → MCP 恒 disconnected(根因报告 dsh-pangu-mcp-disconnect-report.md,

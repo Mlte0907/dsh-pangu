@@ -68,7 +68,7 @@ test('buildRowConfig: 不可用 → fail-loud(默认地址+空 key+启动即失�
 test('injectMcpConfig: 注入完整 config 到 mcp-pangu 行', async () => {
   const p = tmpCfg({ pangu_base_url: 'http://1.2.3.4:19529', api_key: 'k' })
   let got = null
-  const ctx = { loader: { store: { 'mcp-pangu': { update: async (opts) => { got = opts } } } } }
+  const ctx = { loader: { entries: function * () { yield { options: { id: 'mcp-pangu' }, update: async (opts) => { got = opts } } } } }
   const r = await injectMcpConfig(ctx, { error() {} }, p)
   assert.equal(r.ok, true)
   assert.equal(got.config.url, 'http://1.2.3.4:19529/mcp')
@@ -78,7 +78,7 @@ test('injectMcpConfig: 注入完整 config 到 mcp-pangu 行', async () => {
 test('injectMcpConfig: 找不到行只报错不抛(仪表盘不能被打死)', async () => {
   const p = tmpCfg({ pangu_base_url: 'http://1.2.3.4:19529', api_key: 'k' })
   const errs = []
-  const r = await injectMcpConfig({ loader: { store: {} } }, { error: (m) => errs.push(m) }, p)
+  const r = await injectMcpConfig({ loader: { entries: function * () {} } }, { error: (m) => errs.push(m) }, p)
   assert.equal(r.ok, true)
   assert.equal(errs.length, 1)
   assert.match(errs[0], /mcp-pangu/)
