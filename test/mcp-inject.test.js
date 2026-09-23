@@ -54,6 +54,7 @@ test('buildRowConfig: 可用 → 真值 + failOnStartupError:false', () => {
   assert.equal(c.url, 'http://h:1/mcp')
   assert.equal(c.headers['X-API-Key'], 'kk')
   assert.equal(c.failOnStartupError, false)
+  assert.equal(c.reconnect && c.reconnect.maxAttempts, 1000000)
   assert.equal(c.transport, 'streamable-http')
   assert.equal(c.serverName, 'pangu')
 })
