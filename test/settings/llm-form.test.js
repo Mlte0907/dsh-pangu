@@ -92,6 +92,12 @@ function mountSettings(config) {
       return { ok: true, value: { ok: true, ms: 123, model: 'deepseek-chat', sample: '可用' } }
     },
   }
+  // 状态总览的计数。载荷按真机形状给：网关把宿主扁平返回包了一层 data.stats。
+  // （2026-09-24 真机验收时按扁平结构读，页面上直接显示 undefined。）
+  const panguDashboardSvc = {
+    data: async () => ({ ok: true, value: { data: { stats: { total: 203, wings: 2, rooms: 3, platformsCount: 4 } } } }),
+    checkUpdate: async () => ({ ok: true, value: { ok: true, tag: 'v0.4.1' } }),
+  }
 
   const captured = []
   const slots = {
@@ -106,6 +112,7 @@ function mountSettings(config) {
     },
     remote: remoteHub,
     'remote.panguConfig': panguConfigSvc,
+    'remote.panguDashboard': panguDashboardSvc,
   }
   const ctx = { get: (k) => registry[k], effect: () => {} }
 
@@ -358,6 +365,19 @@ test('三个开关都有可及名', { skip }, async () => {
   for (const box of boxes) {
     assert.ok(box.getAttribute('aria-label'), '开关缺少 aria-label')
   }
+})
+
+test('状态总览读的是 data.stats 下的计数，不是 undefined', { skip }, async () => {
+  // 真机验收（2026-09-24）发现：宿主扁平返回被网关包成 { data: { stats } }，
+  // 设置页按扁平结构读，记忆总量直接渲染成 "undefined"。
+  const env = mountSettings(FAKE_CFG)
+  const { container } = await render(env)
+  const cell = (label) => container.querySelector(`[data-pg-cell="${label}"]`)
+  assert.equal(cell('记忆总量')?.getAttribute('data-state'), 'known', '记忆总量应取到计数')
+  assert.ok(cell('记忆总量').textContent.includes('203'), '记忆总量应为 203')
+  assert.ok(cell('记忆总量').textContent.includes('2 翼'), '记忆总量格应带出翼数')
+  assert.ok(cell('接入平台').textContent.includes('4'), '接入平台应为 4')
+  assert.ok(!container.textContent.includes('undefined'), '页面里不应出现 undefined')
 })
 
 test('「放弃」把草稿拉回已保存的值', { skip }, async () => {
