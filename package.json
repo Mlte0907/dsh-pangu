@@ -1,6 +1,6 @@
 {
   "name": "dsh-pangu",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "盘古记忆系统 DSH 插件: MCP 接入 + 内嵌仪表盘(平台管理/知识库/记忆进化/快照)",
   "keywords": [
     "dsh",
