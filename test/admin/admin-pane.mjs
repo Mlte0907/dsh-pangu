@@ -184,7 +184,7 @@ chk('管理页未崩溃', !b.errors.some((e) => /ReferenceError/.test(e)), b.err
 chk('平台列表渲染出真实平台名', b.text.includes('OpenCode Agent'), b.text.slice(0, 160))
 chk('平台计数不再是 0', /^平台1$/.test((b.button || '').replace(/\s+/g, '')), b.button)
 chk('不再出现管理不可用提示', !b.text.includes('管理接口不可用'))
-chk('移除盘古内部标签导航', !b.hasTopTabs, b.html.slice(0, 180))
+chk('保留盘古顶部标签导航', b.hasTopTabs && ['概览', '星系', '结晶', '知识', '管理'].every((label) => b.html.includes(label)), b.html.slice(0, 180))
 chk('移除左侧盘古菜单', !b.hasLeftRail)
 
 console.log()
