@@ -151,7 +151,14 @@ async function renderAdminPlatforms(adminConfigured) {
       await act(async () => { platBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true })) })
       await act(async () => { await new Promise((r) => setTimeout(r, 150)) })
     }
-    return { text: container.textContent.replace(/\s+/g, ' '), button: platBtn && platBtn.textContent.trim(), errors }
+    return {
+      text: container.textContent.replace(/\s+/g, ' '),
+      button: platBtn && platBtn.textContent.trim(),
+      html: container.innerHTML,
+      hasTopTabs: Boolean(container.querySelector('.pangu-dashboard-tabs')),
+      hasLeftRail: Boolean(container.querySelector('.pangu-dashboard-rail')),
+      errors,
+    }
   } finally {
     console.error = origError
   }
@@ -167,16 +174,18 @@ console.log()
 console.log('═══ 场景 A：未配置管理密钥（宿主返回内层错误信封）═══')
 const a = await renderAdminPlatforms(false)
 chk('管理页未崩溃（无 ReferenceError）', !a.errors.some((e) => /ReferenceError/.test(e)), a.errors[0])
-chk('平台区已渲染（不是整体空白）', a.text.includes('平台接入 · 一段话搞定'), a.text.slice(0, 120))
-chk('给出「管理接口不可用」可操作提示', a.text.includes('管理接口不可用') && a.text.includes('未配置管理凭据'), a.text.slice(0, 200))
+chk('平台区已渲染（不是整体空白）', a.text.includes('平台接入'), a.text.slice(0, 120))
+chk('给出管理接口错误提示', a.text.includes('未配置管理凭据') && a.text.includes('重试'), a.text.slice(0, 200))
 
 console.log()
 console.log('═══ 场景 B：已配置管理密钥（宿主返回平台列表）═══')
 const b = await renderAdminPlatforms(true)
 chk('管理页未崩溃', !b.errors.some((e) => /ReferenceError/.test(e)), b.errors[0])
 chk('平台列表渲染出真实平台名', b.text.includes('OpenCode Agent'), b.text.slice(0, 160))
-chk('平台计数不再是 0', /平台 \(1\)/.test(b.button || ''), b.button)
+chk('平台计数不再是 0', /^平台1$/.test((b.button || '').replace(/\s+/g, '')), b.button)
 chk('不再出现管理不可用提示', !b.text.includes('管理接口不可用'))
+chk('保留主面板顶部标签导航', b.hasTopTabs && ['概览', '星系', '结晶', '知识', '管理'].every((label) => b.html.includes(label)), b.html.slice(0, 180))
+chk('移除左侧盘古菜单', !b.hasLeftRail)
 
 console.log()
 console.log(fail === 0 ? '★ 管理页渲染全部正确' : `✗ ${fail} 项失败`)
