@@ -5,7 +5,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { resolveMcpConfig, buildRowConfig, injectMcpConfig, DEFAULT_URL } = require('../lib/mcp-inject')
+const { resolveMcpConfig, buildRowConfig, injectMcpConfig, installMcpConfigReloadHook, DEFAULT_URL } = require('../lib/mcp-inject')
 
 function tmpCfg(value) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pangu-mcp-'))
@@ -74,6 +74,32 @@ test('injectMcpConfig: 注入完整 config 到 mcp-pangu 行', async () => {
   assert.equal(r.ok, true)
   assert.equal(got.config.url, 'http://1.2.3.4:19529/mcp')
   assert.equal(got.config.failOnStartupError, false)
+})
+
+test('app-boot/config-reload 完成后重新注回真实 MCP 配置', async () => {
+  const p = tmpCfg({ pangu_base_url: 'http://1.2.3.4:19529', api_key: 'k' })
+  let reload
+  let got = null
+  const ctx = {
+    loader: {
+      entries: function * () {
+        yield {
+          options: { id: 'mcp-pangu', config: { url: 'http://127.0.0.1:19529/mcp' } },
+          update: async (opts) => { got = opts },
+        }
+      },
+    },
+    on(event, callback) {
+      assert.equal(event, 'app-boot/config-reload')
+      reload = callback
+      return () => {}
+    },
+  }
+  installMcpConfigReloadHook(ctx, { error() {} }, p)
+  assert.equal(typeof reload, 'function')
+  await reload()
+  assert.equal(got.config.url, 'http://1.2.3.4:19529/mcp')
+  assert.equal(got.config.headers['X-API-Key'], 'k')
 })
 
 test('injectMcpConfig: 找不到行只报错不抛(仪表盘不能被打死)', async () => {

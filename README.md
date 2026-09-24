@@ -31,7 +31,7 @@ cd dsh-pangu && ./install.sh          # 默认装到 web profile
 ```
 
 装完 **重启 DSH**（`cordis.patch.yml` 的热更新在 web 实例不生效，必须重启才加载）。
-之后改地址/凭据**无需再重启**：设置页保存即由插件热重注到 MCP 客户端（`lib/mcp-inject.js` → `entry.update`）。
+之后改地址/凭据**无需再重启**：设置页保存即由插件热重注到 MCP 客户端（`lib/mcp-inject.js` → `entry.update`）。DSH profile/Include 重组完成后也会自动重新注入，避免 MCP 行恢复为占位地址。
 
 ## 装完只填两个字段
 
