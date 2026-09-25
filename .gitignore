@@ -6,3 +6,6 @@ node_modules/
 # .gitignore 规则过滤拷贝 —— 一旦被忽略，装好的包里就没有它，
 # DSH 启动即报「未能读取覆盖层 …cordis.patch.yml: ENOENT」（2026-09-22 实测踩到）。
 # 该文件本身不含密钥：X-API-Key 是运行时从 ~/.pangu/config.json 读的 IIFE 表达式。
+
+# 本地改动前快照，不入库（真正的回滚点看 git 历史）
+lib/client.js.bak-*
