@@ -202,6 +202,9 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
     「在「## 10. 维护日志」追加一条」的**引用**而不是真标题，导致日志被判成空的。
     已改成行首锚定正则取最后一个匹配，并把流程块里的引用改写为「§10」。
   - **验证**：`node --test` → 117 pass / 0 fail。`AGENTS.md` 2598 字节。
+  - **修**：`scripts/gen_file_index.py` 会把 `.bak-*` / 编辑器临时目录索引进去。
+    改成跳过一切点开头目录（与盘古仓同一修法，那边是实测到云端 4 个
+    `.bak-decrypt-fix/*.py` 被算进索引才改的）。
 
 - **2026-09-26** — 建这份说明书 + 自动文件索引 + 索引保鲜测试；停用客户端图谱去重。
   - **改**：客户端按 id 去重**整块注释停用**（`lib/client.js` 的 `allNodes/graphEdges`）。

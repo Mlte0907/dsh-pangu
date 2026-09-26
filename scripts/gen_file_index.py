@@ -21,6 +21,18 @@ OUT = ROOT / "docs" / "FILE_INDEX.md"
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".pytest_cache", ".ruff_cache", ".DS_Store"}
 
+
+def skipped(rel) -> str | None:
+    """返回跳过原因，None 表示不跳过。
+
+    点开头的目录一律跳过（2026-09-26 定的）：备份目录 / 编辑器临时目录里的文件
+    不是「这个仓库现在是什么」，数进索引只会让索引开始撒谎。
+    """
+    for part in rel.parts[:-1]:
+        if part in SKIP_DIRS or part.startswith("."):
+            return part
+    return None
+
 SUBSYSTEMS = {
     "lib": "插件主体：宿主面服务、浏览器端面板、Typert 契约、MCP 配置注入",
     "lib/proactive": "主动记忆注入管线：14 个小模块，宿主进程内每轮对话跑一次",
@@ -91,7 +103,7 @@ def collect() -> dict:
         if not p.is_file() or p.suffix not in (".js", ".mjs", ".cjs", ".py"):
             continue
         rel = p.relative_to(ROOT)
-        if any(part in SKIP_DIRS for part in rel.parts):
+        if skipped(rel) is not None:
             continue
         key = group_key(rel)
         groups.setdefault(key, []).append((display_path(rel, key), count_lines(p), first_docstring(p)))
