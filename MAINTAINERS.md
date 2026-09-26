@@ -188,6 +188,28 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-26** — 修移动端（≤720px）盘古工作台完全滚不动：720px 断点把唯一的滚动容器设成了 `overflow:visible`。
+  - **现象**：窄视口下概览/结晶/知识等内容超出视口，滚轮与触摸都滚不动，底部完全够不着。
+  - **根因**：`client.js` 的 `@media (max-width:720px)` 把 `main-wrap` / `main` /
+    `scroll` 三级一起设成 `overflow:visible`，本意是「移动端让页面自己滚」——
+    这是从 V3 移植前的旧版抄来的写法。但 V3 移植后宿主滚动已被
+    `body[data-pangu-view]` 的两条规则关掉（见「藏掉 DSH composer」那条），
+    `.pangu-dashboard-scroll` 成了整条链上**唯一**的滚动容器；一旦设成 visible，
+    内容只是溢出，再被上层 `overflow:hidden` 裁掉，于是彻底不可达。
+  - **修**：720px 断点里改为 `main-wrap/main` 保持 `overflow:hidden`，
+    `.pangu-dashboard-scroll` 保持 `flex:1 1 auto;min-height:0;overflow:auto`。
+  - **验证**（受控对照，避免只测桌面）：把 `client.js` 里真实的仪表盘 CSS 抽出来，
+    放进一个 `overflow:hidden` 的宿主模拟里，内容固定 2200px，只改视口宽度 ——
+    修前 1280px `scrollTop=400` / 700px `scrollTop=0`；修后两者都 `scrollTop=400`。
+    真实应用五视图复验：概览 609、结晶 508、知识 267 可滚，星系与管理刚好铺满，零报错。
+  - **坑**：本 profile 里 ≤720px 会被 **dsh-remote-x 接管**（`body.rm-x-mobile`，
+    按视口宽度触发，与 UA 无关），盘古标签页压根不存在，**无法在真实宿主里端到端复现**。
+    分界线实测：≤720 接管、768–900 侧栏收起、≥1024 才有完整 UI。
+    所以窄屏只能靠上面的受控对照验证 —— 这一点必须记下来，别让下一个人以为窄屏已实测过。
+  - **纪律**：本条是违反仓库硬规则后的补救 —— 动 `lib/**` 前应当先读本文件与 `AGENTS.md`；
+    改完要写本日志、跑 `scripts/gen_file_index.py`、并带
+    `PANGU_TEST_MODULES=<repo>/node_modules` 跑 `node --test`（否则渲染测试静默跳过）。
+
 - **2026-09-26** — 新建精简版 `AGENTS.md`（本仓原先没有），把说明书顶成索引。
   - **为什么**：`AGENTS.md` 由 DSH **自动注入每个进入本项目的会话**，本仓原先没有这个文件，
     等于插件侧完全没硬规则。做成「只留两条硬规则 + 环境速查 + 章节索引 + 三条最贵教训」，
