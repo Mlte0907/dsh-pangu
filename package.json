@@ -34,7 +34,8 @@
   },
   "scripts": {
     "test": "node --test",
-    "test:browser": "node scripts/verify-galaxy.cjs"
+    "test:browser": "node scripts/verify-galaxy.cjs",
+    "test:browser:knowledge": "node scripts/verify-knowledge.cjs"
   },
   "exports": {
     ".": {

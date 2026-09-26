@@ -7,7 +7,7 @@
 > 想了解「插件是什么 / 怎么跑 / 架构与边界」→ 读 [`MAINTAINERS.md`](../MAINTAINERS.md)，
 > 本文件只回答「哪个文件干什么」。
 
-共 **37** 个源文件 / **8,342** 行。
+共 **38** 个源文件 / **8,569** 行。
 
 
 ## `lib/` — 5 文件 / 4,802 行
@@ -66,7 +66,7 @@
 | `sensitive-filter.js` | 22 | (解析失败: SyntaxError) |
 | `stats-collector.js` | 104 | (解析失败: SyntaxError) |
 
-## `scripts/` — 2 文件 / 426 行
+## `scripts/` — 3 文件 / 653 行
 
 运维/验证脚本
 
@@ -74,6 +74,7 @@
 | --- | ---: | --- |
 | `gen_file_index.py` | 166 | 生成「文件职责索引」→ docs/FILE_INDEX.md。 |
 | `verify-galaxy.cjs` | 260 | (解析失败: SyntaxError) |
+| `verify-knowledge.cjs` | 227 | (解析失败: SyntaxError) |
 
 ---
 
