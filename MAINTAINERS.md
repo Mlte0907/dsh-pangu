@@ -188,6 +188,35 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-26** — 知识页从静态 380px 主从列改为抽屉式主从：点行右侧滑出详情、列表压窄保持可见、↑↓ 切换且只刷新面板。
+  - **改**（用户要求）：`.pangu-dashboard-split` 换成 `.pangu-dashboard-master` +
+    `.pangu-dashboard-drawer`。关闭时列表占满整宽（实测 1044px）；`data-drawer="open"` 时
+    列表压到 400px **但仍可见**、详情从右侧 translateX 滑入。用
+    `transition:grid-template-columns` 让「压窄」与「滑出」是同一条动画。
+  - **改**：行组件抽成模块级 `KnowledgeRow`（`React.memo`），`CAT_LABELS`/`CAT_COLORS`/`kbDate`
+    一并提到模块作用域 —— 留在 KnowledgePane 里的话每次 render 都产出新对象引用，memo 全废。
+    `onPick` 用 `useCallback` 固定引用（同理）。
+  - **改**：列表容器 `role="listbox" tabIndex=0`，行 `role="option" aria-selected`；
+    键盘 ↑↓ 移动、Home/End 跳首尾、Esc 收起，另有 × 按钮。当前行沿用本站三编码：
+    左侧色条 + 底色 + 描边。
+  - **验证**（「只刷新面板内容」用 DOM 身份证明，不靠感觉）：给 59 行 DOM 各打一个戳，
+    连按三次 ↓ 后 **59/59 个节点身份全部存活**、`listDomUnchanged=true`，只有详情标题变了。
+    另外实测：未选中列表 1044px / 抽屉 opacity 0；点行后 400px 且 `offsetParent` 非空、
+    opacity 1；`data-current` 始终恰好 1 个；Esc 收回 1044px。零 JS 异常。
+  - **连带修**（抽屉带来的回归，回归测试抓到的）：`.pangu-dashboard-scroll` 原带
+    `overscroll-behavior:contain`。抽屉关闭时列表占满整宽（实测 1044px），整页没有
+    「列表之外」可放指针的地方；列表滚到底后事件被 contain 吃掉，**用户卡在列表末尾、
+    够不到页脚**。改为只在页面级滚动容器用 contain，列表那一级保持默认 auto：
+    列表到头后继续滚，事件传给页面。实测滚到底 page=533/533。
+  - **顺带修了回归测试本身**：`scrollverify` 原来只滚一次、且假设指针下方就是页面滚动容器，
+    在知识页永远判「滚不动」——而实际是滚轮落在列表上、滚的是列表。
+    已改成「反复滚到触底，页面或内层任一到达即算成功」。长期红的测试比没有测试更糟。
+  - **踩**（自己埋的）：替换 `const updateDate = …` 那几行时把函数定义换没了，详情里的
+    `updateDate(selected)` 调用点没跟着改 → **点第一行就 ReferenceError，主从块整块消失**。
+    `node --check` 查不出未定义引用，只有真点一次才会暴露。顺带发现
+    `__check` 层面的教训：改函数定义时必须同时 `grep` 该函数名的所有调用点。
+  - **验证**：`PANGU_TEST_MODULES=<repo>/node_modules node --test` → 117/117。
+
 - **2026-09-26** — 修移动端（≤720px）盘古工作台完全滚不动：720px 断点把唯一的滚动容器设成了 `overflow:visible`。
   - **现象**：窄视口下概览/结晶/知识等内容超出视口，滚轮与触摸都滚不动，底部完全够不着。
   - **根因**：`client.js` 的 `@media (max-width:720px)` 把 `main-wrap` / `main` /
