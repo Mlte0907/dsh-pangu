@@ -203,6 +203,17 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
     连按三次 ↓ 后 **59/59 个节点身份全部存活**、`listDomUnchanged=true`，只有详情标题变了。
     另外实测：未选中列表 1044px / 抽屉 opacity 0；点行后 400px 且 `offsetParent` 非空、
     opacity 1；`data-current` 始终恰好 1 个；Esc 收回 1044px。零 JS 异常。
+  - **补**（用户问「移动端看过了么」后补做，**此前确实没看过**）：抽屉响应式改三档。
+    原先 `@media (max-width:1040px)` 里写的是等分两栏 `minmax(0,1fr) minmax(0,1fr)`，
+    受控实验实测 390px 下两栏各 **168px**、标题只剩 90px 宽、正文完全没法读 ——
+    桌面「列表压窄保持可见」的前提是宽度够放两栏，手机上这个前提不成立。
+    现改为：≥1041px 列表 400px + 抽屉自适应；821–1040px 列表 300px + 抽屉吃剩余；
+    **≤820px 抽屉 `position:absolute; inset:0` 覆盖列表**（列表不卸载、收起即恢复），
+    标题降到 17px。实测 390/768 单列覆盖、1000px `300px 617px`、1280px `400px 797px`，
+    各档标题均不溢出、正文无横向溢出。
+  - **仍未解决**：`scripts/verify-galaxy.cjs` 只覆盖星系视图，知识页的抽屉没有任何
+    自动化验收 —— 上述数字全部来自一次性受控实验脚本。要长期防回归应补一个
+    `test/knowledge/` 或扩充浏览器验收，但本轮没做，记在这里免得下个人以为覆盖到了。
   - **连带修**（抽屉带来的回归，回归测试抓到的）：`.pangu-dashboard-scroll` 原带
     `overscroll-behavior:contain`。抽屉关闭时列表占满整宽（实测 1044px），整页没有
     「列表之外」可放指针的地方；列表滚到底后事件被 contain 吃掉，**用户卡在列表末尾、
