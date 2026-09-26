@@ -188,7 +188,24 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
-- **2026-09-26** — 知识页从静态 380px 主从列改为抽屉式主从：点行右侧滑出详情、列表压窄保持可见、↑↓ 切换且只刷新面板。
+- **2026-09-27** — 仪表盘概览加「LLM 用量」卡片（用户要求）。
+  - **数据流**（用户纠正后确认）：仪表盘走 REST API `/api/v2/admin/stats`
+    （`collect_stats`），不是 MCP 工具。MCP `pangu_stats` 是平台 agent 用的。
+    `collect_stats` 被两者共用，所以 pangu 侧加字段即同时覆盖两条路径。
+  - **改 pangu 侧**（`pangu/server/handlers/system.py`）：`collect_stats` 加
+    `llm_daily`（当日 token/调用数）和 `llm_total`（累计 token/成本/缓存命中率）。
+    数据来自 `LLMEngine.get_stats()` 的 `daily` 字段（`pangu/core/llm.py` 新增
+    `_daily_tokens` 按日统计）。
+  - **改 dsh-pangu 宿主面**（`lib/index.js`）：`fetchPanguStats()` 解析
+    `parsed.llm_daily` → `llmDaily`、`parsed.llm_total` → `llmTotal`，返回值加这两个字段。
+  - **改 dsh-pangu 宿主面**（`lib/typert.host.js`）：`DashboardData` schema 加
+    `llm_daily` 和 `llm_total`（MCP 工具 `pangu_stats` 也返回这些字段，zod 校验需要）。
+  - **改 dsh-pangu 浏览器面**（`lib/client.js`）：概览视图 lower 区域加第三个面板
+    「LLM 用量」，显示今日调用数/今日 Token/输入/输出/累计 Token/缓存命中/预估成本。
+  - **验证**：pangu 侧 238 passed；dsh-pangu `test/file_index_check.mjs` 绿。
+  - **生效方式**：`lib/client.js` 刷新浏览器即可；`lib/index.js` / `typert.host.js`
+    需 `dsh-restart`。
+
   - **改**（用户要求）：`.pangu-dashboard-split` 换成 `.pangu-dashboard-master` +
     `.pangu-dashboard-drawer`。关闭时列表占满整宽（实测 1044px）；`data-drawer="open"` 时
     列表压到 400px **但仍可见**、详情从右侧 translateX 滑入。用
