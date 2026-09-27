@@ -188,6 +188,36 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-27** — 修复仪表盘概览全显 `—`（`fetchPanguStats` ReferenceError 静默吞错）。
+  - **根因**：`lib/index.js` 是 `'use strict'` 且 `fetchPanguStats` 声明块（210-217 行）
+    **漏了 `llmDaily` / `llmTotal` 两个 `let`**，256-257 行赋值直接抛
+    `ReferenceError: llmDaily is not defined` → 260 行 `catch` 把它吞成
+    `{ok:false}` → `client.js:538` 的 `unwrap` **只在顶层 `ok===false` 才抛**，
+    292-318 行的分段 `unwrap` 全走 `catch` 返回 `—`。所以 UI 全 `—` 但控制台
+    **零报错**——症状是"静默失败"，真错误藏在 `dash.stats.error` 里。
+    引入 commit `cfc2341`（2026-09-27 05:28），`node --test` 117/117 仍绿
+    （测试只 mock `fetch`，不执行声明块之后的代码路径）。
+  - **根因②（次生，同 commit）**：返回键写成 camelCase `llmDaily`/`llmTotal`，
+    而 `client.js:1181/1196` 读 `s?.llm_daily` / `s?.llm_total` ⇒ 补完变量
+    LLM 用量卡**仍会为空**。键名必须 snake_case 才能对上 client。
+  - **改**（`lib/index.js`）：声明块补 `let llmDaily; let llmTotal;`；返回对象
+    改 `llm_daily: llmDaily, llm_total: llmTotal`。
+  - **改**（`lib/typert.host.js`）：`DashboardData.stats` schema 同步补
+    `llm_daily` / `llm_total`（zod `.strip()` 运行时对载荷无效，但保持契约一致，
+    否则下次 `pangu.mjs` 快照会漂移）。
+  - **诊断手法（可复用）**：headless Chromium 打开
+    `http://127.0.0.1:3080/?token=<web.log 末尾的 token>` → 进盘古 tab →
+    `session.query(p => p.name)` 顺 React fiber 找 `OverviewPane` →
+    读 `memoizedProps.dash.stats` ⇒ 拿到 `{ok:false, error:"..."}` 真错误。
+    **症状（UI 全 `—`）骗人，fiber 上的 error 才是根因。**
+  - **验证**：`node --check` 两文件过；`node --test` 117/117 绿；
+    `gen_file_index.py` 重新生成 `docs/FILE_INDEX.md`；
+    `test/file_index_check.mjs` 15/15 绿；`dsh-restart` 后 headless Chromium 实测
+    概览恢复真实计数（记忆总量 321 条 / 今日摄入 12 / 知识实体 19 / 来源分布
+    general 165·opencode 88·mcp 57·dsh 4·pangu 31），LLM 用量卡出数
+    （今日调用 2 / 今日 Token 20 / 累计 20），控制台仅剩 1 个与盘古无关的
+    `/api/changes.summary` 404，**无 JS 报错**。
+  - **生效方式**：`lib/index.js` / `lib/typert.host.js` 都是宿主面 → 必须 `dsh-restart`（已重启，token 已轮换）。
 - **2026-09-27** — 修复生命周期标签报错「远程服务 panguDashboard 未就绪」。
   - **根因**：`adminFetch` 从 `config.json` 读取 `admin_secret` 或 `api_key`，但这两个字段在 `config.json` 中不存在（被 `PanguConfig.save()` 排除了）。Key 只存在于独立的 `.api_key` 和 `.admin_secret` 文件中。
   - **改**（`lib/index.js`）：`readAdminSecret()` 在 config.json 没有 key 时，尝试从 `~/.pangu/.api_key` 或 `~/.pangu/.admin_secret` 文件读取。
