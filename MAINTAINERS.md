@@ -189,6 +189,10 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
 - **2026-09-27** — 修复生命周期标签报错「远程服务 panguDashboard 未就绪」。
+  - **根因**：`adminFetch` 从 `config.json` 读取 `admin_secret` 或 `api_key`，但这两个字段在 `config.json` 中不存在（被 `PanguConfig.save()` 排除了）。Key 只存在于独立的 `.api_key` 和 `.admin_secret` 文件中。
+  - **改**（`lib/index.js`）：`readAdminSecret()` 在 config.json 没有 key 时，尝试从 `~/.pangu/.api_key` 或 `~/.pangu/.admin_secret` 文件读取。
+  - **验证**：`test/file_index_check.mjs` 绿。
+  - **生效方式**：`lib/index.js` 刷新浏览器即可。
   - **根因**：`typert.host.js` 里 panguDashboard 服务注册了 7 个方法
     （data/ping/deepHealth/backup/events/add/checkUpdate），但**缺少 lifecycle**。
     LifecyclePane 调 `callRemote('panguDashboard', 'lifecycle')` 找不到方法。
