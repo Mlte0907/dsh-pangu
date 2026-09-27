@@ -195,9 +195,10 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
   - **改 dsh-pangu 宿主面**（`lib/typert.host.js`）：`DashboardData` schema 加
     `lifecycle` 字段（events + stats）。
   - **改 dsh-pangu 宿主面**（`lib/index.js`）：`fetchLifecycle()` 函数调
-    `/api/v2/memories/lifecycle` 获取数据。
+    `/api/v2/memories/lifecycle` 获取数据；`dashboardService` 加 `lifecycle()` 方法。
   - **改 dsh-pangu 浏览器面**（`lib/client.js`）：views 数组加第 6 个视图
-    「生命周期」（key: lifecycle, icon: ◌）。
+    「生命周期」（key: lifecycle, icon: ◌）；加 `LifecyclePane` 组件
+    渲染时间线列表（内容/翼/时间/重要度）。
   - **验证**：pangu 侧 264 passed；dsh-pangu `test/file_index_check.mjs` 绿；
     云端端点已注册（`/memories/lifecycle` 在路由表中）。
   - **生效方式**：`lib/client.js` 刷新浏览器即可；`lib/index.js` /
