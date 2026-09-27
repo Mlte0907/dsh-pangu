@@ -188,7 +188,21 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
-- **2026-09-27** — 仪表盘概览加「LLM 用量」卡片（用户要求）。
+- **2026-09-27** — 仪表盘新增「生命周期」视图（P2-4.4，记忆从入库到遗忘的全轨迹）。
+  - **改 pangu 侧**（`pangu/api/routes_memory.py`，commit e76e5b6）：
+    加 `GET /api/v2/memories/lifecycle` 端点，调用 `TimelineEngine.build_timeline`
+    返回时间线数据，支持 wing 过滤和 limit 限制。
+  - **改 dsh-pangu 宿主面**（`lib/typert.host.js`）：`DashboardData` schema 加
+    `lifecycle` 字段（events + stats）。
+  - **改 dsh-pangu 宿主面**（`lib/index.js`）：`fetchLifecycle()` 函数调
+    `/api/v2/memories/lifecycle` 获取数据。
+  - **改 dsh-pangu 浏览器面**（`lib/client.js`）：views 数组加第 6 个视图
+    「生命周期」（key: lifecycle, icon: ◌）。
+  - **验证**：pangu 侧 264 passed；dsh-pangu `test/file_index_check.mjs` 绿；
+    云端端点已注册（`/memories/lifecycle` 在路由表中）。
+  - **生效方式**：`lib/client.js` 刷新浏览器即可；`lib/index.js` /
+    `typert.host.js` 需 `dsh-restart`。
+- **2026-09-27** — 仪表盘概览加「LLM 用量」卡片（用户要求当日 LLM token 使用量可视化）。
   - **数据流**（用户纠正后确认）：仪表盘走 REST API `/api/v2/admin/stats`
     （`collect_stats`），不是 MCP 工具。MCP `pangu_stats` 是平台 agent 用的。
     `collect_stats` 被两者共用，所以 pangu 侧加字段即同时覆盖两条路径。
