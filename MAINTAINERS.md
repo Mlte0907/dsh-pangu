@@ -188,6 +188,37 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-27** — 生命周期页真正表达「生命周期」：状态徽章 + 分布读数 + 文案纠偏。
+  - **背景**：ROADMAP P2-4.4 的验收标准是「展示记忆**从入库到遗忘的全轨迹**」，
+    但初版页面只有一张按时间排序的清单 —— 用户问「这页是想表达什么」时答不上来。
+    pangu 服务端已同日补齐状态字段（见 pangu-dev §13 同日条目），
+    本仓负责把它显示出来。
+  - **改（`lib/client.js` LifecyclePane）**：
+    - 新增 `LifecycleBadge` 徽章：`保留`(ok) / `待压缩`(t2) / `待归档`(warn) /
+      `待遗忘`(err) / `已归档`(t3) / `已遗忘`(err)，一行就能看出每条在哪一格。
+      **服务端未部署新字段时按 `keep` 兜底**，不因缺字段白屏。
+    - 新增状态分布条（六格计数）—— 这是这一页的核心读数；`stats` 无新字段时
+      整条隐藏，兼容旧服务端。
+    - 每条加 `status_reason`（**为什么**被判这个状态）与归档条目的「离场」日期。
+    - meta 从「N 条记忆 · M 个事件」改为「全库 N · 活跃 A · 本次 M」——
+      初版 `stats.total ≡ limit`，那句「50 条记忆」会被读成全库只有 50 条。
+    - **文案纠偏**：脚注原写「按时间倒序展示最近 50 条」，而实测服务端是
+      **升序 + 取文件头部最旧的 50 条**（云端 n=322、全库 max=09-27，端点却返回
+      max=09-22）。服务端已改倒序取最新，脚注同步改写为
+      「活跃库 + 归档冷存储合并，最新入库在前」，并点明「待*」是**建议**去向、
+      「已归档/已遗忘」才是既成事实。
+    - ViewHeader description 改为「每条记忆现在在哪一格：保留 / 待压缩 /
+      待归档 / 待遗忘，以及已经离场的。」
+  - **改（`lib/typert.host.js`）**：`DashboardData.lifecycle` 与 `_lifecycleData`
+    **两处** schema 同步补 `status/next_action/status_reason/status_score/archived_at`
+    与 stats 的 7 个分布字段。两处缩进不同（6 空格 vs 4 空格），改一处不会自动命中
+    另一处 —— 这是本站「两侧要同时加」的老坑的变体。
+  - **验证**：`node --check lib/client.js` 与 `lib/typert.host.js` 均 OK；
+    `gen_file_index.py` 重新生成；`node --test` 全绿；`dsh-restart` 后
+    headless 实测徽章/分布/倒序均生效（见下条）。
+  - **生效方式**：`lib/client.js` 刷新浏览器即可，但 `lib/typert.host.js` 是宿主面
+    → 本次走了 `dsh-restart`（token 已轮换）。**依赖 pangu 服务端同日的部署**，
+    否则状态字段缺失、页面回退到只有内容与日期。
 - **2026-09-27** — 修「生命周期」页报 `lifecycle error`（鉴权头用错 + 错误被吞）。
   - **根因①（鉴权通道用错）**：`fetchLifecycle` 用 `adminFetch`（发 `X-Admin-Key`），
     但 `/api/v2/memories/lifecycle` 属**数据面**，只认 `X-API-Key`。
