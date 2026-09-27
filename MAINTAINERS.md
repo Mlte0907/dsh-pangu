@@ -199,8 +199,18 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
   - **改 dsh-pangu 宿主面**（`lib/typert.host.js`）：
     - 加 `lifecycle` 方法描述符（service/namespace/method/result）
     - 定义 `_lifecycleData` schema（events + stats）
-  - **验证**：dsh-pangu `test/file_index_check.mjs` 绿。
-  - **生效方式**：`lib/typert.host.js` 需 `dsh-restart`。
+  - **根因③（补，前两条改完仍报错才挖到）**：浏览器面 `lib/client.js` 顶部
+    `DESCRIPTORS` 数组里 panguDashboard 只登记了 6 个方法
+    （data/ping/deepHealth/backup/events/add），**没有 `lifecycle`**。
+    宿主面有方法还不够——客户端描述符表是独立一份，缺了就报
+    「远程服务 panguDashboard 未就绪」。**两侧要同时加，这是本站最容易
+    改一半以为修好了的点。**
+  - **改 dsh-pangu 浏览器面**（`lib/client.js`）：DESCRIPTORS 加
+    `dsh-pangu#panguDashboard/lifecycle` 条目（result → okEnvelope）。
+  - **验证**：`node --check lib/client.js` 过；`test/file_index_check.mjs` 15/15 绿
+    （`gen_file_index.py` 重新生成 `docs/FILE_INDEX.md` 后）。
+  - **生效方式**：`lib/index.js` / `lib/client.js` 刷新浏览器即可；
+    `lib/typert.host.js` 需 `dsh-restart`（已重启，token 已轮换）。
 - **2026-09-27** — 仪表盘新增「生命周期」视图（P2-4.4，记忆从入库到遗忘的全轨迹）。
   - **改 pangu 侧**（`pangu/api/routes_memory.py`，commit e76e5b6）：
     加 `GET /api/v2/memories/lifecycle` 端点，调用 `TimelineEngine.build_timeline`
