@@ -188,6 +188,34 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-27** — 修「生命周期」页报 `lifecycle error`（鉴权头用错 + 错误被吞）。
+  - **根因①（鉴权通道用错）**：`fetchLifecycle` 用 `adminFetch`（发 `X-Admin-Key`），
+    但 `/api/v2/memories/lifecycle` 属**数据面**，只认 `X-API-Key`。
+    实测矩阵（同一把 key 打云端）：
+    `lifecycle → X-Admin-Key=401 / X-API-Key=200`，
+    而 `admin|dashboard|platforms → X-Admin-Key=200 / X-API-Key=401` —— **正好相反**，
+    两套端点两套头。`fetchKG` 走 `fetchJson`（自动挂 x-api-key）所以图谱一直是好的。
+  - **根因②（错误被吞，才是"查不动"的原因）**：401 时 `adminFetch` 返回的 body
+    带 `error` 字段，落进 `if (body && !body.error)` 的**否定分支**，被压成硬编码
+    `return { ok:false, error:'lifecycle error' }` —— 真正的原因（鉴权头用错）
+    就此消失，页面只给一句无从排查的文案。
+  - **改**（`lib/index.js` 的 `fetchLifecycle`）：换 `fetchJson`（与 `fetchKG`
+    同通道）；按 `ApiResponse` 的 `code !== 0` 判成败并透传 `message`；
+    401/403 单独给出可操作提示（「只认数据面凭据 → 设置页填盘古凭据」），
+    不再只报 HTTP 状态码。
+  - **根因③（跨仓，在 pangu 服务端，本仓只记录不改）**：即使鉴权通了，
+    该端点原样回传 `[e.__dict__ for e in events]`，而 `TimelineEvent.content`
+    取自已加密的 `d.content` ⇒ 客户端拿到 `gAAAAAB…` Fernet 密文直接渲染。
+    列表/搜索/详情/导出都过了 `_plain_content()`，唯独生命周期漏了。
+    **已在 pangu-dev 侧修**（`routes_memory.py` 出站前逐条解密 +
+    `tests/test_lifecycle_endpoint.py` 3 例红→绿），需 scp 部署云端才生效。
+  - **验证**：`node --check lib/index.js` SYNTAX_OK；`node --test` 117/117 绿；
+    `dsh-restart` 后 headless 实测生命周期页 `lifecycle error` 消失，渲染出
+    「50 条记忆 · 50 个事件」；密文那半由 pangu 云端 `routes_memory.py` 出站解密
+    承担，**已 scp + 重启 pangu-api**（云端 pytest 3 passed，curl 实测 content
+    为明文），端到端复测：页面既无 `lifecycle error` 也无 `gAAAAA` 密文、无 pageerror。
+  - **生效方式**：`lib/index.js` 是宿主面 → 必须 `dsh-restart`（已重启，token 已轮换）；
+    密文那半 = 云端 pangu，已部署完成。
 - **2026-09-27** — 修复仪表盘概览全显 `—`（`fetchPanguStats` ReferenceError 静默吞错）。
   - **根因**：`lib/index.js` 是 `'use strict'` 且 `fetchPanguStats` 声明块（210-217 行）
     **漏了 `llmDaily` / `llmTotal` 两个 `let`**，256-257 行赋值直接抛
