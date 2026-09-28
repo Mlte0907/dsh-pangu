@@ -188,6 +188,25 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-28** — 修「列表下方凭空一段空白」：关闭态的隐藏抽屉仍然占着 234px 高度。
+  - **症状**（用户反馈「列表这么长，容器下方还有这么大的空白」）：概览未点行时
+    `masterH=605` 而列表内容只有 `371` ⇒ 下方凭空 **234px** 空白。
+  - **根因**：关闭态抽屉只有 `opacity:0` + `pointer-events:none`，**高度还在**；
+    而未点行时 master 是**单列 grid**（`grid=["566px"]`），两个孩子**上下堆叠**
+    ⇒ 那个看不见的空状态抽屉（`min-height:170` + padding ≈ 234）被排到了列表下面。
+  - **改**：`[data-drawer="closed"] .pangu-dashboard-drawer{height:0;overflow:hidden;…}`，
+    关闭时直接不占位；打开时 grid 变两列、`height:auto` 恢复（grid 过渡照常）。
+  - **⚠ 排除掉的两个假设（记下来免得后人重走）**：
+    1. `align-items:stretch` **不是**元凶 —— 改回 `start` 后数据一模一样（blank 234/949）；
+    2. 测出来的 `grid="220px 0px"`、`masterH=15919` 是**我测量选择器选错元素**的假象
+       （`[class*="pangu-dashboard"]` 会命中 tabs/topbar），真实值是 `["220px","330.391px"]`，
+       `clamp` 工作正常。**测量脚本的锚点必须锁到目标容器本身。**
+  - **验证**：未点行 `boxH 605→371`、`blank 234→0`、`scroll=0`（5 条无滚动条）。
+  - **待定（需用户拍板）**：点行后 `blank=949` —— 详情（记忆全文）1429px vs 列表 479px，
+    是 Master-Detail 的固有形态。要么**给详情限高 + 内部滚动**（两列接近等高、空白大减，
+    代价是长文要滚），要么**接受列间落差**。用户明确说过「列表不要滚动条」，
+    但没说详情 —— 故不动，等确认。
+
 - **2026-09-28** — 修主从布局的列宽不自适应（用户反馈「列表的宽距没有自适应」）。
   - **问题**：`.pangu-dashboard-master[data-drawer=open]` 的列表宽是**写死的 400px**，
     不随容器变。headless 实测两种容器的后果：
