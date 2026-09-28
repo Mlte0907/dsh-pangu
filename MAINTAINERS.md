@@ -188,6 +188,38 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-28** — 主从布局三件套：详情限高、列表禁止横滚、知识与生命周期分页。
+  - **① 详情限高（用户选 A）**：`.pangu-dashboard-detail` 加 `max-height:60vh` +
+    `overflow-y:auto`。此前详情（记忆全文）能撑到 **1429px**，而列表只有 479px
+    ⇒ 列表右侧下方凭空 **949px** 空白。限高后两列接近等高（实测 `detailH=780`、
+    `scrollable=1065`），内容不超高就不出滚动条。
+  - **② 列表禁止横向滚动**（用户反馈「有左右滚动条显示」）：
+    `.pangu-dashboard-listbox{overflow-x:hidden !important}`。
+    ⚠ 必须带 `!important` —— 基类 `.pangu-dashboard-scroll{overflow:auto!important}`
+    会压过它（第一版没带，**实测无效**）。
+    ⚠ **这 8~24px 的确切来源尚未定位**：行自身 `scrollWidth==clientWidth`，
+    查不到是哪个子元素撑的 min-content。行内容本就 line-clamp/ellipsis 截断，
+    裁掉右侧这点宽度不丢信息，但**别当成已修好** —— 日后若发现内容右侧被裁，回来补查。
+    （附：我先前报的 `sbWidth=5` 是 `scrollbar-gutter:stable` 预留槽，不是滚动条；
+    真滚动判据是 `scrollHeight>clientHeight`。）
+  - **③ 标题改换行**：生命周期行的 `content`/`status_reason` 由 `nowrap+ellipsis`
+    改为 `-webkit-line-clamp:2/1 + word-break:break-word` —— nowrap 会把行的
+    min-content 撑宽。知识页 `KnowledgeRow.title` 本来就是 clamp 2 行，未改。
+  - **④ 分页（知识 + 生命周期，复用星系页那套）**：`PAGE_SIZE=12` + `pageSafe`
+    防越界 + 数据/筛选变化回第 1 页（否则停在已清空的页上）+ `pangu-dashboard-pager`。
+    * 生命周期实测：`rows=12`、`第 1 / 5 页 · 共 50 条`、点下一页 → `第 2 / 5 页` ✅
+    * ⚠ **键盘导航范围必须是当前页 `pageItems`** —— 拿全量 `shown` 去导航，
+      ↑↓ 会跳到根本没渲染的条目上（`makeListNav` / 滚动跟随都已改用 `pageItems`）。
+    * `pageCount>1` 才渲染 pager ⇒ **只有 5 条时不出现分页条是正确行为**。
+  - **✅ 补验完成（dsh 升级重启后）**：知识页分页实测 —— `kicker=PANGU / KNOWLEDGE`
+    （确实切进去了）、`rows=12`、`第 1 / 6 页 · 共 67 条 123456 下一页`、
+    点下一页 → `第 2 / 6 页`、`lbOverflowX=hidden`、`pageerror: none`。
+    （起因：验证跑到一半 `dsh-web.service` 被 systemd `TERM` 停止 —— 是用户
+    **升级 dsh 到 0.2.0-rc.1** 的正常重启，非故障；升级后 `dsh-pangu MCP injected`
+    仍正常。）⚠ 验证脚本第一版用 `[class*="tab"]` 选中了**整个 tab 栏容器**
+    （所有 tab 拼一起，点了不切页），必须用精确文本 `▤知识` 匹配单个 tab。
+  - **生效方式**：`lib/client.js` 浏览器面，刷新即生效，无需 `dsh-restart`。
+
 - **2026-09-28** — 修「列表下方凭空一段空白」：关闭态的隐藏抽屉仍然占着 234px 高度。
   - **症状**（用户反馈「列表这么长，容器下方还有这么大的空白」）：概览未点行时
     `masterH=605` 而列表内容只有 `371` ⇒ 下方凭空 **234px** 空白。
