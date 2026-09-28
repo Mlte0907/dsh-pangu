@@ -188,6 +188,50 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-28** — 概览「最近入库」与生命周期页改成主从布局（Master-Detail）。
+  - **用户要求**：点行后右侧滑出详情抽屉、列表压窄保持可见、当前行高亮、
+    键盘上下切换**只刷新面板内容**。
+  - **★ 按规矩 8 先查了现成的**：这四件事知识页**早就实现完了** ——
+    * CSS 三件套齐备且**本轮一行没加**：`.pangu-dashboard-master[data-drawer="open"]`
+      （列表压到 400px、详情占余下）、`.pangu-dashboard-drawer`（translateX 滑出，
+      与压窄共用同一条过渡）、`.pangu-dashboard-row[data-current="true"]`（左色条+
+      底色+描边的当前行高亮）；窄屏还有 `absolute inset:0` 的覆盖式抽屉；
+    * 键盘导航（↑↓/Home/End/Esc）与「滚动当前行进可视区」原本内联在 `KnowledgePane`。
+    ⇒ **抽成公共件复用，不抄第二份**：新增 `makeListNav(shown, selectedId, setter)`
+    与 `useScrollCurrentIntoView(listRef, selectedId, len)`，`KnowledgePane` 改用同一份
+    （消除第一处重复），概览与生命周期页复用 —— 抄三份必然各自漂移。
+  - **改① 生命周期页**：`list-col` 扁平列表 → `master + list-col + drawer`。
+    行加 `className="pangu-dashboard-row"` + `role="option"` + `aria-selected` +
+    `data-current`（**高亮选择器要求这几个同时存在**）；抽屉放完整正文
+    （`white-space:pre-wrap`）+ 状态徽章 + `status_reason` + kv 八项字段 + 关闭按钮。
+  - **改② 概览「最近入库」**：卡片内同样结构。`MemRow` 从「点击就地展开」改为
+    「点击选中」—— 就地展开的代价是卡片被撑高、看全文时列表已经滚走了；
+    全文移进抽屉，列表恒 2 行截断。该 `MemRow` 全仓仅此一处使用，改它是安全的。
+    ⚠ 抽屉内容**没有**再套一层 `DashboardPanel`（卡片里套卡片会视觉重复），
+    直接用 `.pangu-dashboard-detail`。
+  - **⚠ hook 位置**：`useScrollCurrentIntoView` 必须插在**所有条件 return 之前**
+    （概览有 `dashErr`/`loading` 两个分支、生命周期页有三个），否则分支一切换
+    hook 数量变化，React 直接报错。
+  - **★ headless 实测抓到的真 bug（初版四要件里键盘两条不工作）**：
+    点行能开抽屉，但 **↑↓ 完全没反应、Esc 收不起来**。根因：`onKeyDown` 绑在
+    `.pangu-dashboard-listbox`，而点的是内部 `div` 行 —— **div 点击不会把焦点让给
+    父级**，事件全打在 body 上，handler 根本不触发。
+    **知识页本来就有这个病**，一并修在公共件 `pickWithFocus(listRef, setter)`：
+    选中的同时把焦点移到 listbox。三处（知识页 `pick` / 概览 `onPick` / 生命周期
+    `onClick`）都改用它 —— 又是一次「抽公共而不是抄三份」。
+  - **验证**：`node --check` 通过；`node --test` **117/117**（含 file_index 与
+    「改 lib 必须写日志」两道门禁）；headless 实测（**刷新即生效，无需重启 dsh**）：
+    * 概览：点行 → `open=1 / current=1 / drawer.opacity=1 / grid="400px 150.391px"`
+      （列表压到 400px、详情占余下）；
+    * `ArrowDown` → 高亮行与右侧内容变、**grid 不变**（列表稳定）；`ArrowUp` 回到原位；
+    * `Esc` → `open=0 / current=0`（收起并清高亮）；
+    * 生命周期页：50 行同样全通过，`grid="400px 688px"`；
+    * `pageerror: none`。
+    ⚠ 验证脚本第一版忘了点「盘古」tab —— body 里那句「盘古 · 在线 357 条」是
+    **侧栏紧凑卡片**不是仪表盘，`.pangu-dashboard-*` 全是 0，白跑一轮。
+  - **生效方式**：`lib/client.js` 是**浏览器面，刷新页面即生效**；本轮只动这一个文件
+    （未碰 `typert.host.js` / `cordis.patch.yml` / `lib/index.js`），**不需要 `dsh-restart`**。
+
 - **2026-09-27** — 生命周期页真正表达「生命周期」：状态徽章 + 分布读数 + 文案纠偏。
   - **背景**：ROADMAP P2-4.4 的验收标准是「展示记忆**从入库到遗忘的全轨迹**」，
     但初版页面只有一张按时间排序的清单 —— 用户问「这页是想表达什么」时答不上来。
