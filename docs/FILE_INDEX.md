@@ -7,16 +7,16 @@
 > 想了解「插件是什么 / 怎么跑 / 架构与边界」→ 读 [`MAINTAINERS.md`](../MAINTAINERS.md)，
 > 本文件只回答「哪个文件干什么」。
 
-共 **38** 个源文件 / **9,098** 行。
+共 **38** 个源文件 / **9,108** 行。
 
 
-## `lib/` — 5 文件 / 5,331 行
+## `lib/` — 5 文件 / 5,341 行
 
 插件主体：宿主面服务、浏览器端面板、Typert 契约、MCP 配置注入
 
 | 文件 | 行 | 职责（首句 docstring） |
 | --- | ---: | --- |
-| `client.js` | 3373 | (解析失败: SyntaxError) |
+| `client.js` | 3383 | (解析失败: SyntaxError) |
 | `index.js` | 1172 | (解析失败: SyntaxError) |
 | `mcp-inject.js` | 155 | (解析失败: SyntaxError) |
 | `typert.host.js` | 595 | (解析失败: SyntaxError) |

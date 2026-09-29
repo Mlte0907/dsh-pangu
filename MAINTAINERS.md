@@ -188,6 +188,43 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-29** — 横向滚动条**定位到根因并修掉**，外加表头被挤成竖排。上一条日志里
+  「8~24px 溢出来源尚未定位 / 别当成已修好」的记号，**本条结清**。
+  - **① 根因：`.pangu-dashboard-row` 缺 `box-sizing:border-box`**。
+    该规则有 `width:100%`，而全局**没有** `*{box-sizing:border-box}`（只有
+    `.pangu-dashboard-scroll` 自己写了）。于是**非 button 的行（div）**走 content-box：
+    `width:100%` 只是**内容宽**，再加左右 padding ⇒ 盒子比容器宽出正好一个 padding。
+    实测三页对得上：概览 4+4=**8px**、生命周期 12+12=**24px**、知识页行是 `<button>`
+    而 Chrome UA 已给 button `border-box` ⇒ 实测 **0px**，从来不溢出。
+    **同一份 CSS 三种表现，只因元素类型不同** —— 这就是之前查不出来的原因：
+    行自身 `scrollWidth==clientWidth`（block 宽就是容器宽），越界的是**行盒子**不是内容，
+    用「找 scrollWidth 更大的子元素」永远找不到。改用
+    `el.getBoundingClientRect().right - (listbox.left + listbox.clientWidth)`
+    一测就现形（8px / 24px 恰好等于 padding）。
+    **教训：判溢出别只扫 scrollWidth，位置法（rect）能抓到 box 层面的越界。**
+  - **② 顺带修好「列表标题被挤成竖排」**（用户原话「列表标题没有宽度自适应换行」）：
+    `.pangu-dashboard-list-head,.pangu-dashboard-list-row` 共用 3 列栅格
+    `28px minmax(0,1fr) 18px`（序号/正文/箭头），但**表头只有 2 个子元素**
+    ⇒ 标题掉进 28px 的序号列，被压成**每字一行**（截图实见「生命/周期/事件」）。
+    而行早已改用 `.pangu-dashboard-row`，那 3 条 `list-row/-title/-index` 规则
+    **全仓零引用**（死 CSS），已删除。表头改为自己的 2 列
+    `minmax(0,1fr) auto`，两处 `marginLeft:'auto'` 随之成为多余、也删了。
+    修后实测 `labelH=16`（单行），抽屉压窄到 218px 宽时仍是 16px。
+    *对照*：星系页 `.pangu-dashboard-entity-head` 与 `-entity-row` 共用 4 列是**对的**，
+    因为它表头和行都真有 4 个子元素 —— 判据是「子元素数是否真的对上」，
+    不是「表头和行就该同栅格」。
+  - **`overflow-x:hidden !important` 保留但降级为兜底**：根因修完后四态实测
+    `scrollWidth-clientWidth` 全为 0、越界元素 0 个，它不再掩盖任何东西。
+    仍要带 `!important`（基类 `.pangu-dashboard-scroll{overflow:auto!important}`
+    同为单类特异性，实测没带会被压过）。
+  - **⚠ 自踩的坑：在 CSS 模板字符串的注释里写反引号**。这段 CSS 在 JS 模板字符串里，
+    注释中 `` `!important` `` 的反引号会**直接截断模板字符串** ⇒ `node --check`
+    报 `SyntaxError: Unexpected token '!'`。写这类注释一律用裸词。
+  - **验证（四态，dsh 0.2.0-rc.1）**：概览 / 知识 / 生命周期 / 生命周期点行后（抽屉开）
+    —— `overX` 全 0、`crossed` 全 0、表头 `labelH=16`、`pageerror: none`；
+    `node --test` 117/117。**生效方式：浏览器面，刷新即可，无需 `dsh-restart`。**
+  - **⚠ dsh 升级会轮换 web token**：headless 验证前先
+    `grep -o 'token=[A-Za-z0-9_-]*' ~/.dsh/web.log | tail -1` 取最新，否则连不上 3080。
 - **2026-09-28** — 主从布局三件套：详情限高、列表禁止横滚、知识与生命周期分页。
   - **① 详情限高（用户选 A）**：`.pangu-dashboard-detail` 加 `max-height:60vh` +
     `overflow-y:auto`。此前详情（记忆全文）能撑到 **1429px**，而列表只有 479px
