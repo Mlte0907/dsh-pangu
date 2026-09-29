@@ -207,16 +207,32 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
   - **验证（真实点 dsh 设置里的 Light/Dark，不是模拟）**：系统深色下
     初始(dsh dark) 深/深 ✅ → 点 Light 后 白/浅 ✅；系统浅色下 白/浅 ✅；
     「系统浅 + dsh 深」在改前一轮已验（深/深 ✅）。**dsh 主题偏好测完已还原 Dark。**
+  - **② 背景/描边改为直接引用宿主令牌**（用户确认「要」，让宿主将来加新主题也自动跟随）。
+    基础块里：`--v3-canvas:var(--dsw-alias-bg-base,#eef0f3)`、
+    `--v3-surface:var(--dsw-alias-bg-layer-1,#f7f8fa)`、
+    `--v3-line:var(--dsw-alias-border-l2,…)`、`--v3-line-2:var(--dsw-alias-border-l3,…)`、
+    `--v3-well:var(--dsw-alias-interactive-bg-hover,…)`；**var() 兜底仍是原手调值**
+    （脱离宿主单跑不会开天窗）。
+    ⇒ **两个深色块里那 5 行（canvas/surface/line/line-2/well）已删** —— 宿主令牌自己会变，
+    再各写一份就是会漂移的重复品（少 10 行）。
+    *为什么 surface 用 layer-1 而不是别的*：宿主浅色下 base 与 layer-1 **都是 #fff**
+    （它靠描边分层，不靠深浅），深色下 base=#151517 / layer-1=#232324 正好构成
+    「页面底 / 卡片面」两级。line 用 **border-l2**（#0000001a）而不是更淡的 border-l1
+    （#0000000a）—— l1 当卡片描边基本看不见。
+    *文字与点缀色刻意不映射*：那是逐值比对调过对比度的，跟着宿主走会打乱已校准的
+    深浅两套可读性。
+  - **验证（真实点 dsh 设置里的 Light/Dark，非模拟）**：两种主题下
+    **仪表盘 canvas 与宿主 body 底色逐字节相同** —— 浅色 `rgb(255,255,255)/#fff`、
+    深色 `rgb(21,21,23)/#151517`；surface `#fff`/`#232324`、well `#2631480f`/`#ffffff14`、
+    line `#0000001a`/`#ffffff1f`。截图目视：浅色下卡片靠描边+阴影分层（与 dsh 一致），
+    深色下两级底色层次清楚、点缀色仍跳。`pageerror: none`。
+  - **发现：Appearance 实际有三档** Light / Dark / **System**（`System` ⇒
+    `data-ds-theme-source="system"`），本次的守卫对这一档同样正确（走媒体查询）。
   - **⚠ dsh 的主题偏好存在服务端、不在 localStorage** ⇒ 自动化测试**会真实改用户的
     主题**，测完必须还原。控件是文本为 `Light`/`Dark` 的 `<button>`，其类名
-    `NhZtOq_themeCube` **每次构建随机化** ⇒ 只能按**文本**点，**不能靠类名**。
-  - **未做（有意）**：没有把 `--v3-canvas` 改成直接引用宿主的
-    `--dsw-alias-bg-base`。V3 调色板是逐值比对通过的（见本文件 CSS 段上方注释），
-    换宿主令牌就不是 V3 了；且浅色下宿主 base 是纯白 `#fff`，而 V3 的
-    surface 是 `#f7f8fa`（比 canvas 浅），直接换会让「卡片比背景浅」的关系**反过来**。
-    实测两套深浅**极性已一致**，只是同一极性下深浅略有色差
-    （深色：宿主 `#151517` vs 仪表盘 `#0a0b0d`；浅色：宿主 `#fff` vs 仪表盘 `#eef0f3`）。
-    要不要逐值对齐宿主是**观感取舍**，留给用户定，没擅自改。
+    `NhZtOq_themeCube` **每次构建随机化** ⇒ 只能按**文本**点，**不能靠类名**；
+    且设置面板有动画会挡住 Playwright 的可操作性检查 ⇒ 用 DOM 直点
+    （`evaluate` 里 `el.click()`）才稳。**本次测完已还原 Dark。**
 
 - **2026-09-29** — 横向滚动条**定位到根因并修掉**，外加表头被挤成竖排。上一条日志里
   「8~24px 溢出来源尚未定位 / 别当成已修好」的记号，**本条结清**。
