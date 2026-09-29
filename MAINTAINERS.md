@@ -188,6 +188,36 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-09-29** — 修「仪表盘背景不跟随 dsh 主题」：媒体查询的守卫是**死代码**。
+  - **症状**：用户把 dsh 切到浅色，仪表盘仍深色（反之亦然）。四种组合实测：
+    **系统深色 + dsh 浅色** ⇒ 宿主 body `rgb(255,255,255)` 白，仪表盘 `--v3-canvas`
+    却是 `#0a0b0d` 深 —— **两者相反**。系统浅色时两个方向都正常，所以只有
+    「系统深色」这一列坏。
+  - **根因**：`@media (prefers-color-scheme:dark)` 那条的守卫写的是
+    `.pangu-dashboard:not([data-theme="light"])`，但 **`data-theme` 宿主从不写在
+    盘古自己创建的根节点上**（宿主只写 `html` / `body`，见
+    `host packages/client/ui-layout/src/client/theme-presenter.ts` 的 `apply()`：
+    `documentElement.setAttribute('data-ds-theme-source', preference==='system'?'system':scheme)`，
+    深色时 `body.setAttribute('data-ds-dark-theme','')`）。
+    ⇒ 那个 `:not()` **永远为真**，等于「无条件跟随操作系统」，而不是跟随 dsh。
+  - **修法**：守卫改成 `html:not([data-ds-theme-source="light"])` ——
+    **宿主没明说浅色**才生效。宿主明说 light 时媒体查询整块跳过（此时也没有
+    body 深色属性 ⇒ 浅色）；说 dark / system / 属性尚未写入时仍按系统走（保留兜底）。
+    `body[data-ds-dark-theme]` 那条**没动**（它才是权威信号，一直是对的）。
+  - **验证（真实点 dsh 设置里的 Light/Dark，不是模拟）**：系统深色下
+    初始(dsh dark) 深/深 ✅ → 点 Light 后 白/浅 ✅；系统浅色下 白/浅 ✅；
+    「系统浅 + dsh 深」在改前一轮已验（深/深 ✅）。**dsh 主题偏好测完已还原 Dark。**
+  - **⚠ dsh 的主题偏好存在服务端、不在 localStorage** ⇒ 自动化测试**会真实改用户的
+    主题**，测完必须还原。控件是文本为 `Light`/`Dark` 的 `<button>`，其类名
+    `NhZtOq_themeCube` **每次构建随机化** ⇒ 只能按**文本**点，**不能靠类名**。
+  - **未做（有意）**：没有把 `--v3-canvas` 改成直接引用宿主的
+    `--dsw-alias-bg-base`。V3 调色板是逐值比对通过的（见本文件 CSS 段上方注释），
+    换宿主令牌就不是 V3 了；且浅色下宿主 base 是纯白 `#fff`，而 V3 的
+    surface 是 `#f7f8fa`（比 canvas 浅），直接换会让「卡片比背景浅」的关系**反过来**。
+    实测两套深浅**极性已一致**，只是同一极性下深浅略有色差
+    （深色：宿主 `#151517` vs 仪表盘 `#0a0b0d`；浅色：宿主 `#fff` vs 仪表盘 `#eef0f3`）。
+    要不要逐值对齐宿主是**观感取舍**，留给用户定，没擅自改。
+
 - **2026-09-29** — 横向滚动条**定位到根因并修掉**，外加表头被挤成竖排。上一条日志里
   「8~24px 溢出来源尚未定位 / 别当成已修好」的记号，**本条结清**。
   - **① 根因：`.pangu-dashboard-row` 缺 `box-sizing:border-box`**。
