@@ -188,6 +188,56 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-10-01** — 修「盘古 tab 点进去是空白」：单条脏数据把整个仪表盘搞崩。
+  - **症状**：tab 在（**tab 是宿主导航的一等 tab，插件只是往里填内容**，所以 tab 一直在），
+    但点进去 `.pangu-dashboard` **不存在**，整块空白。
+  - **真凶**（浏览器 console 实测，不是猜）：
+    ```
+    TypeError: (m.tags || []).slice is not a function
+      at MemRow (plugins/??@deepseek-ai/dsh-session-log-export/client.js,…)
+    slot entry crashed in 'conversation.view'
+    ```
+    一条记忆的 `tags` 存成了 **dict**（`{'item':'取证','room':'tech'}`，应为 list），
+    而 `|| []` **只挡 null/undefined，挡不住 dict** ⇒ `.slice` 抛错 ⇒
+    **React 整棵子树崩掉** ⇒ 面板空白。
+  - **那条数据**：`a5de0c9a`，内容是「control-x 端到端测试受阻…」，`source: mcp`，
+    **2026-10-01 02:25 经 MCP 写入**。全库 455 条里**只有这 1 条是 dict**。
+  - **根因在服务端，不在插件**：`Drawer` 是 **`@dataclass` 而不是 pydantic** ——
+    `tags: list` 只是**类型注解，运行时零校验**，所以任何调用方传 dict/string
+    都会原样存进权威库；`ingestion.remember` 里只有 `tags = tags or []`，
+    **同样只挡空值、不校验类型**。插件 front 端那个 `|| []` 只是把这问题暴露成了白屏。
+  - **改了 3 处**：
+    1. **前端（本次白屏的直接止血）**：`MemRow` 与详情抽屉两处
+       `(m.tags || [])` → **`Array.isArray(...) ? ... : []`**，并给 key/内容加 `String()`。
+       原则：**单条数据格式不对，不该让整个页面白屏**（而且原来只有 F12 看得到）。
+       ⚠ 改的过程中我自己也踩了一次：`python` 批量替换把一处写成了
+       `key: String(tag), key: tag`（**重复 key**），SyntaxError 抓不到但 React 会警告。
+       已手工对齐（详见下方「自查」）。
+    2. **服务端入口（防同类再发生）**：`ingestion.remember` 加 tags 类型归一 ——
+       `str` 按逗号切、**`dict` 取值成列表（不静默丢内容）**、list/tuple/set 逐项转字符串、
+       其它类型**响亮记日志后退化为 `[]`**（fail-loud）。
+    3. **数据**：云端那条 `tags` 由 dict 修正为 `['取证']`（改前已备份 drawers.json）。
+  - **⚠ 顺带更正一个我自己先入为主的判断**：我最初看到
+    `[dsh-pangu] row mcp-pangu not found (bundle patch not mounted?)` 和
+    `profiles/web/cordis.patch.yml` 里「一个盘古条目都没有」，**以为标签页是 profile 的
+    patch 层被整份覆盖导致的**。**那两件事都成立但都不是本次白屏的原因** ——
+    `node_modules/dsh-pangu/cordis.patch.yml` 与仓库 md5 完全一致（`9810842c…`），
+    patch 是好的。**教训：先看 console 里真正的异常，再去猜配置漂移。**
+    （`profiles/web/cordis.patch.yml` 那份被换成通用 dsh 配置的事仍然存在，
+    但它不影响 tab 显示 —— 待查是谁在 02:16 改写的。）
+  - **验证**：
+    - `node --test` **117/117**；`node --check` 通过。
+    - **headless 实测（改前 → 改后）**：`面板存在: false`、console 有
+      `slice is not a function` → **`面板存在: true`**、`body[data-pangu-view]=1`、
+      `[class*=pangu]` 节点 **4 → 108**、**`pageerror: none`**、console 干净。
+    - 三个页面（概览/知识/生命周期）`overX=0`、`errors: none`，无回归。
+    - 服务端归一逻辑逐例验证：dict→取值列表、`"a, b ,c"`→切分、`None`→`[]`、
+      `123`→`[]` 且**响亮记日志**、`list`→原样。
+    - 云端数据：改前 `{'list':454,'dict':1}` → 改后 **`{'list':455}`**（`a5de0c9a`
+      修成 `['取证','tech']`），改前已备份
+      `drawers.json.bak-tags-fix-20261001-031424`。
+    - 云端重启后 health ok（23s 就绪），ingestion.py 已部署且 md5 与本地一致。
+
 - **2026-09-29** — 修「仪表盘背景不跟随 dsh 主题」：媒体查询的守卫是**死代码**。
   - **症状**：用户把 dsh 切到浅色，仪表盘仍深色（反之亦然）。四种组合实测：
     **系统深色 + dsh 浅色** ⇒ 宿主 body `rgb(255,255,255)` 白，仪表盘 `--v3-canvas`
