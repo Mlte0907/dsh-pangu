@@ -72,6 +72,14 @@ DSH（DeepSeek Harness）侧的**盘古记忆接入层**。三件事：
 
 设置页在 DSH 的设置区（`settings.section`），负责 `~/.pangu/config.json` 的真实读写。
 
+分区：`00` 服务与凭据 · `01` LLM 配置 · `02` 记忆维护 · `02B` 语音转写 · `02C` 多模态
+· **`03` 侧栏卡片** · `04` 只读信息 · `05` 平台接入 · `06` 关于与更新。
+
+**★ 03「侧栏卡片」是唯一的例外：它不写 config.json。** 两个开关（整张卡片开关、
+「只显示实体/知识/来源/平台」）存在**浏览器 `localStorage`**（键 `pangu:sidebar-prefs`），
+点一下即生效、不需要保存按钮。理由见 §10 的 2026-10-02 日志。
+去 `lib/index.js` 里找这两个键是找不到的 —— 它们不在那儿。
+
 ---
 
 ## 4. 宿主面服务（`lib/index.js`）
@@ -187,6 +195,64 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
+
+- **2026-10-02** — 设置页新增两个**侧栏卡片**开关：整张卡片开关（默认开）+「只显示实体/知识/来源/平台」。
+  - **★ 它不写 `~/.pangu/config.json`，存的是浏览器 `localStorage`**（键 `pangu:sidebar-prefs`）。
+    这个事实最容易误判 —— 下一个维护者会去 `lib/index.js` 里找一个根本不存在的键。
+    三个理由（都不是「随手选的」）：
+    1. 它是**显示偏好**，不是引擎配置。写进 config.json 会跟着 `saveConfig` →
+       `pangu_config_set` 的推送路径走一趟，而那套流程是为 LLM/巩固这类真配置设计的。
+    2. **同步读取**。config.json 只能经 remote 异步取 ⇒ 卡片首帧必先画「完整卡片」，
+       几十毫秒后再切成精简或隐藏 —— 每开一次页面都闪一下。localStorage 在 render 里
+       同步可读 ⇒ 首帧即最终形态。
+    3. 只碰 `lib/client.js` ⇒ **不需要 `dsh-restart`**，刷新即可（§2 铁律）。
+    代价（明说）：偏好按「浏览器 + 站点」存，换浏览器或换入口要重设一次。
+  - **刻意不接进 `dirty`/`save`**：显示偏好点一下就该生效。塞进保存按钮会让人以为
+    「不点保存不生效」，而它压根不需要热加载。
+  - **脏输入校验（与 2026-10-01 那条 tags 脏数据同源）**：`readSidebarPrefs` 对每个键
+    **逐项 `typeof === 'boolean'`**。localStorage 里是用户可随手改的任意 JSON ——
+    写成 `"false"`（字符串）是合法的，`if (v.card)` 会把它当**真**；写成 `0` 同理。
+    另：JSON 损坏 / 非对象 / 缺单个键，一律**回默认而非抛异常**，且缺一个键不影响另一个。
+  - **卡片关掉时连轮询一起停**：两个定时器（30s `data` + 12s `events`）的 effect 依赖
+    `cardOn`，关掉即 return（不 cleanup）—— 否则用户只是「看不见」，宿主仍在每 12 秒
+    发一次远程调用，白烧网络与云端开销。
+  - **渲染顺序要紧**：`!cardOn`（不渲染）→ `!wide`（窄徽标）→ `minimal`（四格）→ 完整卡片。
+    ⚠ **我第一版把 `minimal` 放在了 `!wide` 前面**，会让「只显示四格」在只有徽标那么窄的
+    侧栏里硬塞一个四列网格（每格 ~30px，数字换行）。窄形态里本来就没有这四格。
+    由 `test/settings/sidebar-prefs.mjs` 场景 4 抓住。
+  - **四格指标抽成 `vitals(marginTop, key)` 单一定义**：完整卡片与精简形态共用，
+    免得两处各算一遍出现数值不一致。`key` 由调用方传 —— 完整形态下它是数组子元素，
+    缺 key React 会警告（`node --check` 抓不到，只有渲染时才报，同 2026-10-01 教训）。
+  - **设置页新增 03 区「侧栏卡片」**，并把原来的 03~05 顺延为 04~06（编号是给人看的，
+    撞号比跳号更糟）。卡片关着时「只显示四格」那一行**整行收起** —— 留一个改了也
+    看不见的开关比不留更让人困惑。
+  - **两个测试配套，缺一不可**（这是刻意设计，不是重复）：
+    - `test/settings/sidebar-prefs.mjs` —— 挂载**真实** `client.js`（jsdom），断言端到端：
+      默认完整卡片 → 四格 → 卡片消失 → 窄徽标不受影响 → 损坏存储不崩。
+    - `test/settings/sidebar-prefs.test.js` —— 12 条**纯逻辑**，穷举脏输入
+      （`"false"` / `0` / `null` / 数组 / 损坏 JSON / 缺单键）。它复制了一份实现，
+      所以**实现漂移时会假绿** —— 另一个测试就是为此存在的。
+  - **顺手改了一处既有测试假设**：`llm-form.test.js` 的「三个开关都有可及名」原本
+    `assert.equal(boxes.length, 3)`。加两个开关必然变红，但**写死个数是错的断言**
+    —— 它真正要守的是「每个开关都有 aria-label」。改成下限 + 按 aria-label 逐个点名，
+    失败信息直接指出缺哪个。
+  - **验证**：`node --test` **131 项 / 0 失败**（新增 13 项）；`node --check` 通过；
+    渲染测试 27 项断言全绿（含「未触发任何额外远程取数」这条即时生效的证据）。
+  - **真机 Playwright 验证**（刷新即生效，**不需要 `dsh-restart`**）：
+    | 步骤 | 结果 |
+    | --- | --- |
+    | 默认 | 完整卡片（状态行 + 499 条记忆 + 7 日曲线 + 四格） |
+    | 点「只显示四格」 | **立刻**只剩 `19 实体 84 知识 9 来源 5 平台`，状态行与条数行都没了 |
+    | 点「关闭卡片」 | 侧栏一个盘古元素都不剩 |
+    | 刷新页面 | 仍记住（`{card:false, minimal:true}`） |
+    | console | `_errs: []` 零报错 |
+  - **调试真机的两个坑（非产品 bug，但下次还会踩）**：
+    1. `Toggle` 的 `<input>` 是 **0×0 且 `opacity:0`**（视觉上只剩开关图形），
+       Playwright 会以 `Element is outside of the viewport` **拒点**。
+       解法：点包住它的 `<label>`（`box.evaluate(el => el.closest('label').click())`）。
+    2. 真机里设置入口的 class 是**构建期哈希**（`i25t7W_trigger`），别按 class 找 ——
+       用 `[aria-label="设置"]`。且打开后还要点「盘古记忆系统」才展开
+       `settings.section`（默认只列各节标题，不渲染内容）。
 
 - **2026-10-02** — 改名：`budget-allocator` 导出的 `allocate` → `allocateBudget`（纯改名，无行为变更）。
   - **改了什么**（全仓 7 处，逐处核对过）：`lib/proactive/budget-allocator.js:7` 函数定义、

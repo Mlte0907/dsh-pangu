@@ -355,15 +355,25 @@ test('服务端状态灯反映真实连通性，不谎报就绪', { skip }, asyn
   )
 })
 
-test('三个开关都有可及名', { skip }, async () => {
+test('所有开关都有可及名', { skip }, async () => {
   // 开关的 <input> 是透明的，文字在 <label> 之外 —— 不给 aria-label 的话
   // 读屏只会念「复选框」，用户不知道是哪个设置（2026-09-24）。
+  //
+  // 2026-10-02：数量由 3 变 5 —— 新增侧栏卡片的两个开关（03 区）。
+  // 这里刻意**不再写死个数**：写死的数字每次加开关都要改测试，而这条测试
+  // 真正要守的是「每个开关都有可及名」。个数用下限断言 + 按 aria-label
+  // 逐个点名，既守住可及名，又能立刻告诉维护者「多/少了哪个」。
   const env = mountSettings(FAKE_CFG)
   const { container } = await render(env)
   const boxes = [...container.querySelectorAll('input[type=checkbox]')]
-  assert.equal(boxes.length, 3, '应渲染三个开关')
+  assert.ok(boxes.length >= 3, `开关数量回落到 ${boxes.length}，至少要有原有的三个`)
   for (const box of boxes) {
     assert.ok(box.getAttribute('aria-label'), '开关缺少 aria-label')
+  }
+  // 逐个点名：新增开关漏了 aria-label 时，失败信息直接指出是哪个
+  const names = boxes.map((b) => b.getAttribute('aria-label'))
+  for (const must of ['自动巩固', '启用 Whisper 语音转写', '启用多模态内容提取', '显示侧栏卡片']) {
+    assert.ok(names.includes(must), `找不到开关「${must}」。现有：${names.join(' / ')}`)
   }
 })
 

@@ -7,22 +7,22 @@
 > 想了解「插件是什么 / 怎么跑 / 架构与边界」→ 读 [`MAINTAINERS.md`](../MAINTAINERS.md)，
 > 本文件只回答「哪个文件干什么」。
 
-共 **38** 个源文件 / **9,133** 行。
+共 **40** 个源文件 / **9,607** 行。
 
 
-## `lib/` — 5 文件 / 5,366 行
+## `lib/` — 5 文件 / 5,500 行
 
 插件主体：宿主面服务、浏览器端面板、Typert 契约、MCP 配置注入
 
 | 文件 | 行 | 职责（首句 docstring） |
 | --- | ---: | --- |
-| `client.js` | 3403 | (解析失败: SyntaxError) |
+| `client.js` | 3537 | (解析失败: SyntaxError) |
 | `index.js` | 1177 | (解析失败: SyntaxError) |
 | `mcp-inject.js` | 155 | (解析失败: SyntaxError) |
 | `typert.host.js` | 595 | (解析失败: SyntaxError) |
 | `version.js` | 36 | (解析失败: SyntaxError) |
 
-## `test/` — 16 文件 / 2,324 行
+## `test/` — 18 文件 / 2,664 行
 
 测试（node --test）
 
@@ -32,7 +32,7 @@
 | `admin/admin-pane.mjs` | 192 | (解析失败: SyntaxError) |
 | `config/ensure-dir.mjs` | 97 | (解析失败: SyntaxError) |
 | `dfx/dfx.test.js` | 50 | (解析失败: SyntaxError) |
-| `file_index_check.mjs` | 193 | (解析失败: SyntaxError) |
+| `file_index_check.mjs` | 203 | (解析失败: SyntaxError) |
 | `graph/crystal-pane.mjs` | 185 | (解析失败: SyntaxError) |
 | `integration/injection.test.js` | 101 | (解析失败: SyntaxError) |
 | `mcp-inject.test.js` | 112 | (解析失败: SyntaxError) |
@@ -40,8 +40,10 @@
 | `proactive/config-infra.test.js` | 89 | (解析失败: SyntaxError) |
 | `proactive/consolidate-pipeline.test.js` | 127 | (解析失败: SyntaxError) |
 | `settings/llm-config.test.js` | 164 | (解析失败: SyntaxError) |
-| `settings/llm-form.test.js` | 414 | (解析失败: SyntaxError) |
+| `settings/llm-form.test.js` | 424 | (解析失败: SyntaxError) |
 | `settings/save-semantics.mjs` | 220 | (解析失败: SyntaxError) |
+| `settings/sidebar-prefs.mjs` | 194 | (解析失败: SyntaxError) |
+| `settings/sidebar-prefs.test.js` | 126 | (解析失败: SyntaxError) |
 | `version/check-update.mjs` | 105 | (解析失败: SyntaxError) |
 | `version/is-newer.test.js` | 37 | (解析失败: SyntaxError) |
 

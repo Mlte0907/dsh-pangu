@@ -139,6 +139,16 @@ test('记录了渲染测试静默跳过这个坑与其解法', () => {
   assert.ok(doc.includes('node --test'), '必须给出常规测试跑法')
 })
 
+test('侧栏卡片显示偏好的事实被写进说明书（防误判：它不写 config.json）', () => {
+  const doc = readDoc()
+  // 这两个开关最容易踩的坑是「以为它存在 ~/.pangu/config.json 里」——
+  // 实际存在浏览器 localStorage。说明书必须写明，否则下一个维护者会去
+  // index.js 里找一个根本不存在的键。
+  assert.ok(/侧栏卡片/.test(doc), '说明书没记录侧栏卡片显示偏好这个功能')
+  assert.ok(/localStorage/.test(logSection(doc)), '维护日志必须写明偏好存在 localStorage')
+  assert.ok(/侧栏卡片/.test(logSection(doc)), '维护日志必须记下这两个开关')
+})
+
 test('维护日志里记了客户端去重已停用这件事', () => {
   const doc = readDoc()
   assert.ok(/去重/.test(logSection(doc)), '日志应记录去重停用')
