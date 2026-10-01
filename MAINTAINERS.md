@@ -188,6 +188,37 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-10-02** — 改名：`budget-allocator` 导出的 `allocate` → `allocateBudget`（纯改名，无行为变更）。
+  - **改了什么**（全仓 7 处，逐处核对过）：`lib/proactive/budget-allocator.js:7` 函数定义、
+    同文件 `:38` 的 `module.exports`；`lib/proactive/injection-pipeline.js:69` 的
+    `budgetAllocator.allocate(...)`（走命名空间属性，**不是**解构，所以只改调用点即可）；
+    `test/proactive/cache-algo.test.js:8` 的解构 import 与 `:50/:56/:63` 三个调用点。
+  - **为什么**：模块里还有 `SINGLE_MAX` / `MIN_KEEP` / `TOKEN_FACTOR` 三个导出，
+    `allocate` 作为光杆名词在别的文件里含义不清（分配什么？），带 `Budget` 更自解释。
+  - **怎么确认没漏**：全仓 `grep -rnE '\ballocate\b'`（含被 .gitignore 忽略的文件，
+    排除 node_modules/.git）→ **零命中**；`lib/index.js` 不直接 require 本模块，
+    只经 `injection-pipeline.js` 到达，故无第三条路径。
+  - **验证**：`node --check` 三个文件均通过（注意：**它查不出未定义引用**，见下方教训）；
+    `node --test` **117/117**；其中 `test/proactive` + `test/integration` **43/43**
+    —— 这组才是真正证明改名后 `budgetAllocator.allocateBudget` **运行时能解析**的证据。
+  - **教训（与 §0 同族）**：`node --check` 通过 ≠ 改名正确。它只做语法检查，
+    把 `foo.bar` 写成 `foo.baz` 它照样放行 —— **只有真跑一遍调用路径才算数**。
+  - **⚠ 顺带发现（不是本次改动造成的）**：执行期间本仓有**并发会话**在改文件
+    （`lib/index.js` 的 mtime 02:04:26 晚于本次改名的 02:03:43，内容是一条 census 注释），
+    它的 `docs/FILE_INDEX.md` 过期一度让 `file_index_check.mjs` 变红。
+    **用 `git stash push docs/FILE_INDEX.md` 单独复验过：过期与本次改名无关**（改名三个文件行数未变）。
+    本次已重新生成索引。并发改同仓时，**先分清红灯是谁的责任**再动手。
+
+- **2026-10-02** — 给 `census()` 补一行说明它干什么的注释（纯注释，无行为变更）。
+  - **改了什么**：`lib/index.js` census 定义正上方加一行,说明它是**只读快照 + 打一行日志**,
+    记 `t` / tools 视图命中数 / `mcp__pangu__` 工具数 / `mcp-pangu` 行 fiber 状态,
+    并指明打点来自下方 4s、12s、15s×40 时间轴与 `tools/change` 四处调用。
+  - **为什么**：census 是排查「MCP 挂了没有」的第一手证据（§0：别拿没验证过的探针当证据），
+    但函数体里的三行块注释只解释**字段含义**，没写**这个函数本身做什么、谁调它**。
+    2026-10-01 那次 `rawPangu` 恒 0 的误报，正说明这条链上的注释值得更完整。
+  - **怎么验证**：`node --check lib/index.js` 通过；`node --test` 全绿。
+    **未 `dsh-restart`**：改动是纯注释，字节码行为零变化，重启只会白白轮换 token。
+
 - **2026-10-01** — 修 census 探针的 `rawPangu` / `totalTools` **恒为 0**：访问了 `ctx.tools` 上不存在的属性。
   - **症状**：`~/.dsh/web.log` 里 **3870 次采样全部** `rawPangu=0 totalTools=0`，
     而同期 `view=2/2`（走 `svc.get()`）—— 工具其实在位，探针却报 0。
