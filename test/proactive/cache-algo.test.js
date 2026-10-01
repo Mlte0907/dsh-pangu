@@ -5,7 +5,7 @@ const assert = require('node:assert/strict')
 const { createMessageCache } = require('../../lib/proactive/message-cache')
 const { rank } = require('../../lib/proactive/score-ranker')
 const { createDedupTracker } = require('../../lib/proactive/dedup-tracker')
-const { allocate } = require('../../lib/proactive/budget-allocator')
+const { allocateBudget } = require('../../lib/proactive/budget-allocator')
 const { format } = require('../../lib/proactive/context-formatter')
 const { createCircuitBreaker } = require('../../lib/proactive/circuit-breaker')
 const { extractResults } = require('../../lib/proactive/memory-fetcher')
@@ -47,20 +47,20 @@ test('DedupTracker global跨会话去重', () => {
 })
 
 test('BudgetAllocator 预算内全入选', () => {
-  const { injected, tokensUsed } = allocate([{ id: '1', content: 'short' }, { id: '2', content: 'tiny' }], 500)
+  const { injected, tokensUsed } = allocateBudget([{ id: '1', content: 'short' }, { id: '2', content: 'tiny' }], 500)
   assert.equal(injected.length, 2)
   assert.ok(tokensUsed <= 500)
 })
 
 test('BudgetAllocator 超预算截断', () => {
-  const { injected, tokensUsed } = allocate([{ id: '1', content: 'x'.repeat(800) }], 300)
+  const { injected, tokensUsed } = allocateBudget([{ id: '1', content: 'x'.repeat(800) }], 300)
   assert.equal(injected.length, 1)
   assert.equal(tokensUsed, 300)
   assert.ok(injected[0].content.length < 800)
 })
 
 test('BudgetAllocator 单条200字符截断', () => {
-  const { injected } = allocate([{ id: '1', content: 'x'.repeat(800) }], 2000)
+  const { injected } = allocateBudget([{ id: '1', content: 'x'.repeat(800) }], 2000)
   assert.ok(injected[0].content.length <= 201)
 })
 
