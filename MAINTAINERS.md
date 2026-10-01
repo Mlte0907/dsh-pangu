@@ -188,6 +188,33 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 格式：`- **YYYY-MM-DD** — 改了什么 / 为什么 / 怎么验证的`。最新在最上面。
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
+- **2026-10-01** — 修 census 探针的 `rawPangu` / `totalTools` **恒为 0**：访问了 `ctx.tools` 上不存在的属性。
+  - **症状**：`~/.dsh/web.log` 里 **3870 次采样全部** `rawPangu=0 totalTools=0`，
+    而同期 `view=2/2`（走 `svc.get()`）—— 工具其实在位，探针却报 0。
+    我一度据此向用户**误报「Pangu MCP 挂了」**，核对 `view=` 才发现是探针自己的问题。
+  - **根因**（`lib/index.js` census()）：
+    ```js
+    if (svc.tools && typeof svc.tools.keys === 'function') { ... }
+    ```
+    `ctx.get('tools')` 拿到的是 `ToolRuntime`（dsh `packages/core/tools/src/index.ts:807`），
+    它**没有公开 `.tools` 表** —— public 只有 `register`/`get`/`restrict`/`guard`/
+    `schemas`/`executionMode`/`presentAs`，工具表在私有的 `ToolLayer.tools`（类型 `NamedEntries`）。
+    ⇒ `svc.tools` 恒 `undefined` ⇒ `typeof` 守卫**静默短路** ⇒ 计数循环一次没跑过。
+    - 顺带澄清一个容易指错的点：`NamedEntries` **本身有** `keys()`
+      （dsh `packages/core/scope/src/store.ts:78`），所以毛病**不在它**，在取错了对象 ——
+      **两层守卫叠在一起，把「取不到」伪装成了「没有」**。
+  - **改法**：换成 `ToolRuntime` 的公共枚举口 **`svc.schemas()`**（返回 `ToolSchema[]`，带 `name`）。
+    语义从「原始注册表」变成「模型可见工具集」—— 对诊断反而更准（探针要判的就是模型能不能调）。
+    **字段名与日志格式不变**，全仓仅日志行自身引用这两个字段，无下游解析，故不构成破坏性改动。
+  - **怎么验证**：`node --check lib/index.js` 通过；**`dsh-restart` 后实测**（2026-10-01 23:2x）：
+    `census(4s/12s/t1..t4): view=2/2 rawPangu=31 totalTools=90 mcpRowFiber=ACTIVE`
+    —— 此前同一位置 **3870 次采样恒 `rawPangu=0 totalTools=0`**，现与 `view=2/2` 相互印证。
+    （MCP 行 LOADING 期仍报 0，属正常：工具尚未注册。）`dsh-pangu` 全量 `node --test` **117 passed**。
+  - **教训（与 §0 认知错误同族）**：**探针字段本身也要验证**。
+    一个「看起来在工作的仪表」给出的恒定 `0`，和「真的没有」在日志里长得一模一样。
+    判据只能是**拿一条独立的正确通道对照**（本次是 `view=` 走 `svc.get()`）——
+    别拿没验证过的探针当证据。
+
 - **2026-10-01** — 修「盘古 tab 点进去是空白」：单条脏数据把整个仪表盘搞崩。
   - **症状**：tab 在（**tab 是宿主导航的一等 tab，插件只是往里填内容**，所以 tab 一直在），
     但点进去 `.pangu-dashboard` **不存在**，整块空白。
