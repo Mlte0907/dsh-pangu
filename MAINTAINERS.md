@@ -197,6 +197,24 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
 > 由 `test/file_index_check.mjs` 核对最新日期。
 
 - **2026-10-10** — 修「LLM 用量」面板恒显示旧数字：数据源从盘古自身计数换成**供应商账单**。
+  - **⚠⚠ 部署事实（今天实测纠正了一个流传的错误认知，代价是白验证一轮）**：
+    **DSH 加载的不是本源码仓。** profile 里写的是
+    `dependencies.dsh-pangu = link:/home/xiaoxin/.dsh-pangu`，而
+    `~/.dsh-pangu` 是一个**独立的 git clone**（不是符号链接），
+    HEAD 停在**已 push 的最后一个 commit**。
+    - 由此推出两条**必须**记住的：
+      1. **改完 `lib/**` 不 push = 线上跑的还是旧文件。** 浏览器 F5 也没用 ——
+         服务端直接读 clone 里的文件。
+      2. **`pnpm dsh plugin update` 对本插件是空操作。** 它只是
+         `runProfilePnpm(context, args)` 转发给 pnpm，而依赖是 `link:` ——
+         pnpm 无从「更新」一个本地路径。实测跑两次都输出 `Done`，clone 纹丝不动。
+    - **正确的上线流程**：
+      ```sh
+      git push                       # 源码仓 → GitHub
+      cd ~/.dsh-pangu && git pull --ff-only   # ← 这一步才是真正"部署"
+      dsh-restart                    # lib/index.js / typert.host.js 等宿主侧改动
+      ```
+    - ⚠ 本文件 §2「改 `lib/client.js` → 刷新浏览器」只在**已部署**的前提下成立。
   - **用户报的现象**：「dsh 的盘古插件的 LLM 用量一直没有改变」。
     **LLM 本身没坏**（端点 200、主力 `DeepSeek-V4.1-Flash` 0.9s 正常返回）。
     断的是**计量与显示**这条链路。
@@ -244,6 +262,25 @@ PANGU_TEST_MODULES=<repo>/node_modules node test/admin/admin-pane.mjs
     - **鉴别力实测**：把 `client.js` + `typert.host.js` 还原到 HEAD，
       7 项里 **2 项失败**；恢复后 7/7 绿。
   - **验证**：`node --test` **138 项 / 0 失败**（新增 7）；`node --check` 通过。
+  - **★ 真机验证暴露了第 4 环（另一个 commit `a7a7037` 修）**：schema 和面板都改对了、
+    服务端也确认在记账（**今日 7 次 / 6.0K token**，修复前是 0），
+    但**账单那 9 行仍全是「—」**，控制台零报错。
+    - 根因：`fetchUsage()` 取 `(await fetchJson(...))?.usage`，**假设响应有顶层
+      `usage` 字段**。而 AMD Radeon OneClick 的顶层键是
+      `organization_id, rpm_limit, daily_cost_*, all_time, today, by_model, ...`
+      —— **没有 `usage` 包装层**，用量平铺在顶层。于是 `?.usage` → `undefined`
+      → 被 `|| null` 吞成 null。
+    - **★ 我漏掉它的原因，反过来就是一条通用纪律**：
+      **先读代码、后抓响应，凭字段名想当然。顺序反了。**
+      应该先 `curl` 一次看真实响应，再决定怎么取 ——
+      抓响应只要 1 秒，猜错则让整轮验证白做。
+    - **这一环的特性**：前 3 环各自都能单独解释「显示不正常」，但**必须全部修完**
+      才见效。少任何一个，数据都到不了面板，而**症状看起来一模一样**。
+    - 改法：flat / wrapped 两种形状都认，判据用「有没有用量特征字段」
+      （`today` / `all_time` / `daily_cost_used_usd`）而不是猜供应商；
+      都不像则报 `unrecognized`。新增 `source` 字段回报形状，让面板能区分
+      **「查询失败」/「无数据」/「账单未取到」** —— 原先一律显示「—」，
+      而这三种的处置完全不同，排障无从下手。
 
 - **2026-10-02** — 设置页新增两个**侧栏卡片**开关：整张卡片开关（默认开）+「只显示实体/知识/来源/平台」。
   - **★ 它不写 `~/.pangu/config.json`，存的是浏览器 `localStorage`**（键 `pangu:sidebar-prefs`）。
