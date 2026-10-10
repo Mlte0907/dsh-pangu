@@ -142,6 +142,91 @@ test('schema 声明的 usage 字段必须覆盖 AMD 实际返回的键', async (
   assert.ok(parsed.daily_cost_limit_usd != null, '预算额度被剥空了')
 })
 
+// ── 第 4 环：fetchUsage 的载荷形状（2026-10-10 真机才发现）──
+
+test('★ fetchUsage 必须认得「用量平铺在顶层」的响应（AMD 真实形状）', () => {
+  // 这是在真机上才暴露的第 4 环缺陷：原代码取 `(await fetchJson(...))?.usage`，
+  // 假设响应有顶层 `usage` 字段。AMD Radeon OneClick **没有** —— 用量平铺在
+  // 顶层（today / all_time / daily_cost_*），于是取到 undefined 被 `|| null`
+  // 吞掉，面板永远「—」且控制台零报错。
+  //
+  // 前 3 环（schema 剥空 / 前端不读 / 服务端只记部分）修完之后，数据能走到前端了，
+  // 这一环才暴露出来 —— 每一环都能单独解释「显示不正常」，必须全部修完才见效。
+  const AMD = {
+    organization_id: 'oneclick-org-68353', rpm_limit: 20,
+    daily_cost_limit_usd: 1, daily_cost_used_usd: 0.0034, daily_cost_remaining_usd: 0.9966,
+    today: { requests: 18, total_tokens: 27732, prompt_tokens: 27097, completion_tokens: 635 },
+    all_time: { requests: 2189, total_tokens: 12427146, kv_cache_hit_rate: 0.7878, cost: 0.9458 },
+  }
+  // 复刻 lib/index.js fetchUsage 的判据
+  const pick = (raw) => {
+    const wrapped = raw && typeof raw.usage === 'object' && raw.usage !== null ? raw.usage : null
+    const flat = raw && typeof raw === 'object'
+      && (raw.today || raw.all_time || raw.daily_cost_used_usd != null) ? raw : null
+    if (wrapped) return { source: 'wrapped', usage: wrapped }
+    if (flat) return { source: 'flat', usage: flat }
+    return { source: 'unrecognized', usage: null }
+  }
+
+  const r = pick(AMD)
+  assert.equal(r.source, 'flat')
+  assert.equal(r.usage.today.requests, 18)
+  // 旧写法在这里拿到 undefined
+  assert.equal(AMD.usage, undefined, 'AMD 响应没有顶层 usage 字段 —— 这正是旧代码失效的原因')
+})
+
+test('包在 .usage 里的形状仍要认（不能为了修一个供应商弄坏另一个）', () => {
+  const pick = (raw) => {
+    const wrapped = raw && typeof raw.usage === 'object' && raw.usage !== null ? raw.usage : null
+    const flat = raw && typeof raw === 'object'
+      && (raw.today || raw.all_time || raw.daily_cost_used_usd != null) ? raw : null
+    if (wrapped) return { source: 'wrapped', usage: wrapped }
+    if (flat) return { source: 'flat', usage: flat }
+    return { source: 'unrecognized', usage: null }
+  }
+  const r = pick({ usage: { today: { requests: 3 } } })
+  assert.equal(r.source, 'wrapped')
+  assert.equal(r.usage.today.requests, 3)
+})
+
+test('不认识的响应报 unrecognized 而不是假装有数据', () => {
+  const pick = (raw) => {
+    const wrapped = raw && typeof raw.usage === 'object' && raw.usage !== null ? raw.usage : null
+    const flat = raw && typeof raw === 'object'
+      && (raw.today || raw.all_time || raw.daily_cost_used_usd != null) ? raw : null
+    if (wrapped) return { source: 'wrapped', usage: wrapped }
+    if (flat) return { source: 'flat', usage: flat }
+    return { source: 'unrecognized', usage: null }
+  }
+  for (const raw of [null, {}, { foo: 1 }, { usage: null }, { usage: 'x' }, 42]) {
+    assert.equal(pick(raw).source, 'unrecognized', `raw=${JSON.stringify(raw)}`)
+    assert.equal(pick(raw).usage, null)
+  }
+})
+
+test('★ 源码里 fetchUsage 不得回退到裸 ?.usage', () => {
+  const src = require('node:fs').readFileSync(path.join(ROOT, 'lib', 'index.js'), 'utf8')
+  const start = src.indexOf('async function fetchUsage')
+  assert.ok(start > 0, 'index.js 里找不到 fetchUsage')
+  const block = src.slice(start, start + 1800)
+  // 形状判据必须还在（flat / wrapped 两种都认）
+  assert.ok(/const\s+flat\s*=/.test(block), 'fetchUsage 丢了「平铺响应」的判据')
+  assert.ok(/raw\.today\s*\|\|\s*raw\.all_time/.test(block), 'flat 判据必须是「有 today/all_time/daily_cost 特征字段」')
+  assert.ok(/'flat'/.test(block) && /'wrapped'/.test(block), '必须同时支持 flat 与 wrapped 两种形状')
+  // 旧的裸取值：`(...))?.usage || null` 会对平铺响应取到 undefined
+  assert.ok(!/\)\?\.usage\s*\|\|\s*null/.test(block),
+    'fetchUsage 又退回了 `(...)?.usage || null` —— 对平铺响应恒为 null')
+})
+
+test('★ 面板必须靠 source 区分「没取到」与「没解析出来」', () => {
+  const src = require('node:fs').readFileSync(path.join(ROOT, 'lib', 'client.js'), 'utf8')
+  const start = src.indexOf("h(DashboardPanel, { title: 'LLM 用量'")
+  const block = src.slice(start, start + 4600)
+  assert.ok(block.includes('usageSource'), '面板没有读 usage.source，无法区分失败原因')
+  assert.ok(block.includes('供应商账单未取到'), '缺少「账单未取到」的显式提示')
+  assert.ok(block.includes('用量查询失败'), '缺少「查询失败」与「无数据」的区分')
+})
+
 // ── 防漂移：复刻必须跟真实源码保持一致 ──
 
 test('★ 取值逻辑与 lib/client.js 源码保持一致（否则本文件会假绿）', () => {
