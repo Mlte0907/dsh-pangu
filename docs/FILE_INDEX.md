@@ -7,22 +7,22 @@
 > 想了解「插件是什么 / 怎么跑 / 架构与边界」→ 读 [`MAINTAINERS.md`](../MAINTAINERS.md)，
 > 本文件只回答「哪个文件干什么」。
 
-共 **40** 个源文件 / **9,607** 行。
+共 **41** 个源文件 / **9,860** 行。
 
 
-## `lib/` — 5 文件 / 5,500 行
+## `lib/` — 5 文件 / 5,582 行
 
 插件主体：宿主面服务、浏览器端面板、Typert 契约、MCP 配置注入
 
 | 文件 | 行 | 职责（首句 docstring） |
 | --- | ---: | --- |
-| `client.js` | 3537 | (解析失败: SyntaxError) |
+| `client.js` | 3582 | (解析失败: SyntaxError) |
 | `index.js` | 1177 | (解析失败: SyntaxError) |
 | `mcp-inject.js` | 155 | (解析失败: SyntaxError) |
-| `typert.host.js` | 595 | (解析失败: SyntaxError) |
+| `typert.host.js` | 632 | (解析失败: SyntaxError) |
 | `version.js` | 36 | (解析失败: SyntaxError) |
 
-## `test/` — 18 文件 / 2,664 行
+## `test/` — 19 文件 / 2,835 行
 
 测试（node --test）
 
@@ -41,6 +41,7 @@
 | `proactive/consolidate-pipeline.test.js` | 127 | (解析失败: SyntaxError) |
 | `settings/llm-config.test.js` | 164 | (解析失败: SyntaxError) |
 | `settings/llm-form.test.js` | 424 | (解析失败: SyntaxError) |
+| `settings/llm-usage-panel.test.js` | 171 | (解析失败: SyntaxError) |
 | `settings/save-semantics.mjs` | 220 | (解析失败: SyntaxError) |
 | `settings/sidebar-prefs.mjs` | 194 | (解析失败: SyntaxError) |
 | `settings/sidebar-prefs.test.js` | 126 | (解析失败: SyntaxError) |
